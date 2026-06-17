@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/*
+  Design tokens — Tailwind v4 CSS-based config
+  Adapasi dari CLAUDE.md untuk Tailwind v4 (@theme, bukan tailwind.config.ts)
+
+  Mapping dari spec CLAUDE.md:
+    --color-bg-primary    → bg-cream   (background utama)
+    --color-bg-secondary  → bg-silk    (card & section terang)
+    --color-accent-brown  → *-brown    (aksen primer)
+    --color-accent-green  → *-forest   (aksen sekunder)
+    --color-text-primary  → text-ink   (hitam cengkeh)
+    --color-text-muted    → text-stone (abu coklat)
+    --color-border        → *-sand     (border halus)
+*/
+
+@theme {
+  --color-cream:  #F5F0E8;
+  --color-silk:   #FDFAF5;
+  --color-brown:  #8B6B3D;
+  --color-forest: #2C3E30;
+  --color-ink:    #1A1512;
+  --color-stone:  #6B5F52;
+  --color-sand:   #D9D0C1;
+}
+
+/* Font families — inline karena referensi ke next/font runtime CSS vars */
+@theme inline {
+  --font-serif: var(--font-playfair), Georgia, "Times New Roman", serif;
+  --font-sans:  var(--font-inter), system-ui, Arial, sans-serif;
+}
+
+/* Base styles */
+body {
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Selection highlight */
+::selection {
+  background-color: var(--color-brown);
+  color: var(--color-silk);
+}

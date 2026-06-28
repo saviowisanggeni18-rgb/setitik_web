@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils'
 
 const navLinks = [
   { href: '/catalog', label: 'Koleksi' },
-  { href: '/story', label: 'Kisah' },
   { href: '/about', label: 'Tentang' },
   { href: '/impact', label: 'Dampak' },
   { href: '/mbatik-bareng', label: 'Mbatik Bareng' },
@@ -16,16 +15,23 @@ const navLinks = [
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
+
+  useEffect(() => setMounted(true), [])
 
   return (
     <header className="sticky top-0 z-50 bg-cream/95 backdrop-blur-sm border-b border-sand">
       <nav className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link
           href="/"
-          className="font-serif text-xl text-ink tracking-wide hover:text-brown transition-colors duration-300"
+          className="flex items-center gap-2.5 font-serif text-xl text-ink tracking-wide hover:text-brown transition-colors duration-300"
           onClick={() => setOpen(false)}
         >
+          <span
+            className="flex-none w-8 h-8 rounded-full border border-sand bg-sand/20"
+            aria-hidden="true"
+          />
           Setitik
         </Link>
 
@@ -37,7 +43,7 @@ export default function Navbar() {
                 href={href}
                 className={cn(
                   'font-sans text-sm tracking-wide transition-colors duration-300',
-                  pathname === href || pathname.startsWith(href + '/')
+                  mounted && (pathname === href || pathname.startsWith(href + '/'))
                     ? 'text-brown'
                     : 'text-stone hover:text-ink'
                 )}

@@ -2,26 +2,38 @@
 
 import { motion } from 'framer-motion'
 
-const ease = [0.22, 1, 0.36, 1] as const
+const ease = [0.16, 1, 0.3, 1] as const
+
+/* Stagger antar dua kolom (foto → kutipan) */
+const containerVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.25 } },
+}
+
+/* Stagger di dalam kolom kutipan (label → blockquote → attribution) */
+const quoteColVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 32 },
+  show: { opacity: 1, y: 0, transition: { duration: 1.0, ease } },
+}
 
 export default function FounderQuoteSection() {
   return (
     <section className="py-24 px-6">
       <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-16 md:gap-24 items-center">
-
-          {/* Kiri — foto founder placeholder */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.8, ease }}
-          >
-            {/*
-              Placeholder foto Jessie Setiawati.
-              Ganti dengan <Image> saat foto tersedia.
-              Rasio 3:4 (portrait) — lebih personal dari persegi.
-            */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: false, amount: 0.2, margin: "0px 0px -5% 0px" }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-16 md:gap-24 items-center"
+        >
+          {/* Foto — muncul pertama */}
+          <motion.div variants={itemVariants}>
             <div
               className="w-full aspect-[3/4] bg-sand rounded-sm"
               role="img"
@@ -29,26 +41,25 @@ export default function FounderQuoteSection() {
             />
           </motion.div>
 
-          {/* Kanan — kutipan */}
-          <motion.div
-            initial={{ opacity: 0, y: 28 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.8, ease, delay: 0.15 }}
-            className="flex flex-col justify-center"
-          >
-            <p className="font-sans text-xs uppercase tracking-[0.25em] text-stone mb-8">
+          {/* Kutipan — nested stagger: label → blockquote → attribution */}
+          <motion.div variants={quoteColVariants} className="flex flex-col justify-center">
+            <motion.p
+              variants={itemVariants}
+              className="font-sans text-xs uppercase tracking-[0.25em] text-stone mb-8"
+            >
               Dari pendiri
-            </p>
+            </motion.p>
 
-            <blockquote className="font-serif text-2xl md:text-3xl text-ink leading-[1.45] mb-10">
+            <motion.blockquote
+              variants={itemVariants}
+              className="font-serif text-2xl md:text-3xl text-ink leading-[1.45] mb-10"
+            >
               &ldquo;Bangunan cagar budaya bukan hanya tentang masa lalu.
               Ia adalah cermin siapa kita hari ini, dan siapa yang akan
               kita tinggalkan untuk generasi berikutnya.&rdquo;
-            </blockquote>
+            </motion.blockquote>
 
-            {/* Attributi */}
-            <div className="border-l-2 border-brown pl-5">
+            <motion.div variants={itemVariants} className="border-l-2 border-brown pl-5">
               <p className="font-serif text-lg text-ink">Jessie Setiawati</p>
               <p className="font-sans text-sm text-stone mt-1">
                 Founder &amp; Pembatik Tulis
@@ -56,10 +67,10 @@ export default function FounderQuoteSection() {
               <p className="font-sans text-xs text-stone/60 mt-0.5">
                 Setitik Cultureware · Semarang, sejak 2019
               </p>
-            </div>
+            </motion.div>
           </motion.div>
 
-        </div>
+        </motion.div>
       </div>
     </section>
   )

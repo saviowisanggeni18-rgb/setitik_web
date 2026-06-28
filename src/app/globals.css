@@ -30,17 +30,35 @@
   --font-sans:  var(--font-inter), system-ui, Arial, sans-serif;
 }
 
-/* Base styles */
-body {
-  background-color: var(--color-cream);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+/*
+  @layer base — base styles yang tidak boleh kalah cascade dari Tailwind utilities.
+  Dalam Tailwind v4, @layer base dideklarasikan sebelum @layer utilities sehingga
+  properti yang tidak di-override utility akan tetap berlaku.
+  Background body (cream + grain) ditaruh di sini agar tidak konflik cascade.
+*/
+@layer base {
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-/* Selection highlight */
-::selection {
-  background-color: var(--color-brown);
-  color: var(--color-silk);
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: url("/textures/grain.svg");
+    background-repeat: repeat;
+    background-size: 200px 200px;
+    opacity: 0.45;
+  }
+
+  ::selection {
+    background-color: var(--color-brown);
+    color: var(--color-silk);
+  }
 }

@@ -2,7 +2,6 @@ import Link from 'next/link'
 
 const footerLinks = [
   { href: '/catalog', label: 'Koleksi' },
-  { href: '/story', label: 'Kisah Kami' },
   { href: '/about', label: 'Tentang' },
   { href: '/impact', label: 'Dampak' },
   { href: '/mbatik-bareng', label: 'Mbatik Bareng' },
@@ -78,13 +77,18 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-16 pt-8 border-t border-silk/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <p className="font-sans text-xs text-silk/30">
-            © {new Date().getFullYear()} Setitik Cultureware. Kota Lama, Semarang.
+        <div className="mt-16 pt-8 border-t border-silk/10">
+          <p className="font-sans text-xs text-silk/70 italic text-center mb-8">
+            Setiap bangunan punya cerita. Kami hanya membantu menenunnya.
           </p>
-          <p className="font-sans text-xs text-silk/30">
-            Mendokumentasikan cagar budaya, satu motif setiap saat.
-          </p>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <p className="font-sans text-xs text-silk/30">
+              © {new Date().getFullYear()} Setitik Cultureware. Kota Lama, Semarang.
+            </p>
+            <p className="font-sans text-xs text-silk/30">
+              Mendokumentasikan cagar budaya, satu motif setiap saat.
+            </p>
+          </div>
         </div>
       </div>
     </footer>

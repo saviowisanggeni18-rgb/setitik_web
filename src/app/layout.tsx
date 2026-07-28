@@ -3,6 +3,7 @@ import { Playfair_Display, Inter } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import PageTransition from '@/components/layout/PageTransition'
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -38,7 +39,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col text-ink font-sans">
         <Navbar />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+          <PageTransition>{children}</PageTransition>
+        </main>
         <Footer />
       </body>
     </html>

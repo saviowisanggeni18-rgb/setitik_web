@@ -1,90 +1,133 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { ArrowUpRight, Menu, X } from 'lucide-react'
 
 const navLinks = [
-  { href: '/catalog', label: 'Koleksi' },
-  { href: '/about', label: 'Tentang' },
-  { href: '/impact', label: 'Dampak' },
-  { href: '/mbatik-bareng', label: 'Mbatik Bareng' },
-]
+  { href: '/', label: 'Home', note: 'Halaman awal' },
+  { href: '/catalog', label: 'Belanja', note: 'Produk Setitik' },
+  { href: '/about', label: 'Tentang', note: 'Cerita dan perjalanan' },
+  { href: '/impact', label: 'Dampak', note: 'Warisan dan komunitas' },
+  { href: '/mbatik-bareng', label: 'Mbatik Bareng', note: 'Jadwal dan pendaftaran' },
+] as const
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
 
-  useEffect(() => setMounted(true), [])
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`)
 
   return (
-    <header className="sticky top-0 z-50 bg-cream/95 backdrop-blur-sm border-b border-sand">
-      <nav className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-50 border-b border-sand bg-silk">
+      <nav className="mx-auto flex h-[76px] max-w-7xl items-center justify-between px-6">
         <Link
           href="/"
-          className="flex items-center gap-2.5 font-serif text-xl text-ink tracking-wide hover:text-brown transition-colors duration-300"
+          className="group flex items-center gap-5"
           onClick={() => setOpen(false)}
         >
-          <span
-            className="flex-none w-8 h-8 rounded-full border border-sand bg-sand/20"
-            aria-hidden="true"
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/brand/setitik-wordmark.png"
+            alt="Setitik"
+            className="h-10 w-auto"
           />
-          Setitik
+          <span className="hidden h-7 w-px bg-sand lg:block" />
+          <span className="hidden font-sans text-[8px] uppercase leading-relaxed tracking-[0.18em] text-stone lg:block">
+            Cultureware
+            <br />
+            Semarang
+          </span>
         </Link>
 
-        {/* Desktop nav */}
-        <ul className="hidden md:flex items-center gap-8">
-          {navLinks.map(({ href, label }) => (
-            <li key={href}>
+        <div className="hidden items-center rounded-full border border-sand bg-cream p-1.5 shadow-[0_8px_28px_rgba(68,52,34,0.08)] md:flex">
+          {navLinks.map(({ href, label }) => {
+            const active = isActive(href)
+            return (
               <Link
+                key={href}
                 href={href}
-                className={cn(
-                  'font-sans text-sm tracking-wide transition-colors duration-300',
-                  mounted && (pathname === href || pathname.startsWith(href + '/'))
-                    ? 'text-brown'
-                    : 'text-stone hover:text-ink'
-                )}
+                className={`rounded-full px-5 py-2.5 font-sans text-[10px] uppercase tracking-[0.13em] transition-colors duration-150 ${
+                  active
+                    ? 'bg-forest text-silk shadow-md'
+                    : 'text-stone hover:bg-silk hover:text-ink'
+                }`}
               >
                 {label}
               </Link>
-            </li>
-          ))}
-        </ul>
+            )
+          })}
+        </div>
 
-        {/* Mobile toggle */}
         <button
-          className="md:hidden text-ink p-1"
-          onClick={() => setOpen(!open)}
+          type="button"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-sand bg-cream text-ink transition-colors hover:border-brown hover:text-brown md:hidden"
+          onClick={() => setOpen((current) => !current)}
+          aria-expanded={open}
+          aria-controls="mobile-navigation"
           aria-label={open ? 'Tutup menu' : 'Buka menu'}
         >
-          {open ? <X size={20} /> : <Menu size={20} />}
+          {open ? <X size={19} /> : <Menu size={19} />}
         </button>
       </nav>
 
-      {/* Mobile menu */}
       {open && (
-        <div className="md:hidden border-t border-sand bg-cream">
-          <ul className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-5">
-            {navLinks.map(({ href, label }) => (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className={cn(
-                    'font-sans text-base tracking-wide transition-colors duration-300',
-                    pathname === href || pathname.startsWith(href + '/')
-                      ? 'text-brown'
-                      : 'text-stone hover:text-ink'
-                  )}
-                  onClick={() => setOpen(false)}
-                >
-                  {label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+        <div
+          id="mobile-navigation"
+          className="overflow-hidden border-t border-sand bg-forest text-silk md:hidden"
+        >
+          <div className="mx-auto max-w-7xl px-6 py-5">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="font-sans text-[8px] uppercase tracking-[0.22em] text-silk">
+                Navigasi
+              </p>
+              <p className="font-sans text-[8px] uppercase tracking-[0.18em] text-brown">
+                Setitik Cultureware
+              </p>
+            </div>
+
+            <ul>
+              {navLinks.map(({ href, label, note }, index) => {
+                const active = isActive(href)
+                return (
+                  <li key={href} className="border-t border-silk/12">
+                    <Link
+                      href={href}
+                      onClick={() => setOpen(false)}
+                      className="group flex items-center gap-4 py-5"
+                    >
+                      <span
+                        className={`font-sans text-[9px] tracking-[0.14em] ${
+                          active ? 'text-brown' : 'text-silk'
+                        }`}
+                      >
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-serif text-2xl text-silk">
+                          {label}
+                        </span>
+                        <span className="mt-1 block font-sans text-[10px] text-silk">
+                          {note}
+                        </span>
+                      </span>
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-full border transition-all ${
+                          active
+                            ? 'border-brown bg-brown text-silk'
+                            : 'border-silk text-silk group-hover:border-brown group-hover:text-brown'
+                        }`}
+                      >
+                        <ArrowUpRight size={14} aria-hidden />
+                      </span>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
         </div>
       )}
     </header>

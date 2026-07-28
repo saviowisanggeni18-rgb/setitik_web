@@ -1,314 +1,466 @@
 'use client'
 
+import { FormEvent, useState } from 'react'
 import { motion } from 'framer-motion'
-import { events } from '@/data/events'
+import { CheckCircle2, Clock, Loader2, MapPin, Send, Sparkles, Users } from 'lucide-react'
+import type { MbatikEvent } from '@/lib/mbatik-events'
 
 const ease = [0.16, 1, 0.3, 1] as const
 
 const containerVariants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.15 } },
+  show: { transition: { staggerChildren: 0.03 } },
 }
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 32 },
-  show: { opacity: 1, y: 0, transition: { duration: 1.0, ease } },
+  hidden: { opacity: 0, y: 6 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.28, ease } },
 }
 
-const statusLabel: Record<string, string> = {
-  open: 'Buka',
-  full: 'Penuh',
-  'coming-soon': 'Segera',
-}
-
-const statusColor: Record<string, string> = {
-  open: 'text-forest',
-  full: 'text-stone',
-  'coming-soon': 'text-brown',
-}
-
-const galleryItems = [
-  { id: '1', caption: 'Kegiatan Juni 2026', label: 'Dokumentasi Mbatik Bareng Juni 2026' },
-  { id: '2', caption: 'Kegiatan Mei 2026', label: 'Dokumentasi Mbatik Bareng Mei 2026' },
-  { id: '3', caption: 'Kegiatan April 2026', label: 'Dokumentasi Mbatik Bareng April 2026' },
-  { id: '4', caption: 'Kegiatan Maret 2026', label: 'Dokumentasi Mbatik Bareng Maret 2026' },
+const gallery = [
+  {
+    src: '/images/mbatik-bareng/mbatik-jalanan-02.webp',
+    alt: 'Peserta Mbatik di Jalanan di depan bangunan Kota Lama',
+    caption: 'Belajar di teras kota',
+    position: 'center',
+  },
+  {
+    src: '/images/mbatik-bareng/mbatik-jalanan-01.webp',
+    alt: 'Peserta Mbatik di Jalanan berfoto di depan Gedung Marba',
+    caption: 'Kota Lama sebagai ruang belajar',
+    position: 'center 60%',
+  },
+  {
+    src: '/images/mbatik-bareng/mbatik-jalanan-03.webp',
+    alt: 'Peserta belajar mencanting bersama',
+    caption: 'Mengenal canting dan malam',
+    position: 'center',
+  },
+  {
+    src: '/images/mbatik-bareng/mbatik-jalanan-04.webp',
+    alt: 'Peserta membatik bersama di tepi jalan Kota Lama',
+    caption: 'Membatik di bawah cahaya sore',
+    position: 'center',
+  },
+  {
+    src: '/images/mbatik-bareng/mbatik-jalanan-05.webp',
+    alt: 'Display kain dan peserta Mbatik di Jalanan',
+    caption: 'Motif Setitik hadir di jalanan',
+    position: 'center',
+  },
+  {
+    src: '/images/mbatik-bareng/membatik-bersama-01.webp',
+    alt: 'Peserta mengerjakan kain batik bersama',
+    caption: 'Proses kecil yang saling dibantu',
+    position: 'center 72%',
+  },
 ]
 
-export default function MbatikBarengAnimated() {
+const registrationNotes = [
+  'Pemula boleh ikut',
+  'Alat disiapkan',
+  'Belajar langsung di Kota Lama',
+]
+
+export default function MbatikBarengAnimated({ events }: { events: MbatikEvent[] }) {
+  const [upcomingEvents, setUpcomingEvents] = useState(events)
+  const [submitting, setSubmitting] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const openEvents = upcomingEvents.filter(
+    (event) => event.status === 'open' && event.availableSlots > 0,
+  )
+
+  async function handleRegistrationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    setSubmitting(true)
+    setMessage('')
+    setError('')
+
+    const form = event.currentTarget
+    const formData = new FormData(form)
+
+    try {
+      const response = await fetch('/api/mbatik-registrations', {
+        method: 'POST',
+        body: formData,
+      })
+      const responseText = await response.text()
+      let payload: {
+        message?: string
+        event?: MbatikEvent
+      } = {}
+
+      try {
+        payload = responseText ? JSON.parse(responseText) : {}
+      } catch {
+        throw new Error(
+          response.ok
+            ? 'Pendaftaran diproses, tetapi respons server tidak valid.'
+            : 'Server gagal memproses pendaftaran. Muat ulang halaman lalu coba lagi.'
+        )
+      }
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? 'Gagal mengirim pendaftaran.')
+      }
+
+      if (payload.event) {
+        setUpcomingEvents((current) =>
+          current.map((item) => (item.id === payload.event?.id ? payload.event : item))
+        )
+      }
+      form.reset()
+      setMessage(payload.message ?? 'Pendaftaran berhasil.')
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : 'Gagal mengirim pendaftaran.'
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
-    <div className="py-24 px-6">
-      <div className="max-w-3xl mx-auto">
-
-        {/* ── Hero — label → h1 → deskripsi → catatan lokasi ── */}
-        <motion.div
+    <div className="overflow-hidden px-6 py-8 md:py-10">
+      <div className="mx-auto max-w-7xl">
+        <motion.section
           variants={containerVariants}
           initial="hidden"
-          whileInView="show"
-          viewport={{ once: false, amount: 0.2, margin: "0px 0px -5% 0px" }}
+          animate="show"
+          className="relative min-h-[500px] overflow-hidden rounded-[30px] bg-forest text-silk shadow-[0_28px_85px_rgba(30,45,34,0.2)] md:min-h-[540px]"
         >
-          <motion.p
-            variants={itemVariants}
-            className="font-sans text-xs uppercase tracking-[0.25em] text-stone mb-4"
-          >
-            Kegiatan
-          </motion.p>
-          <motion.h1
-            variants={itemVariants}
-            className="font-serif text-4xl md:text-5xl text-ink mb-6 leading-tight"
-          >
-            Mbatik di jalanan,<br />bareng.
-          </motion.h1>
-          <motion.p
-            variants={itemVariants}
-            className="font-sans text-base text-stone leading-relaxed mb-4 max-w-lg"
-          >
-            Setiap Kamis minggu ketiga, kami membuka ruang belajar membatik
-            langsung di tepi jalan Kota Lama Semarang. Terbuka untuk semua,
-            tanpa perlu pengalaman sebelumnya.
-          </motion.p>
-          <motion.p
-            variants={itemVariants}
-            className="font-sans text-sm text-stone italic mb-16"
-          >
-            Lokasi: Taman Srigunting, Kota Lama Semarang · 09.00–12.00 WIB
-          </motion.p>
-        </motion.div>
-
-        {/* ── Suasana placeholder ── */}
-        <motion.div
-          variants={itemVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: false, amount: 0.2, margin: "0px 0px -5% 0px" }}
-          className="mb-24"
-        >
-          <div
-            className="w-full aspect-video bg-sand rounded-sm"
-            role="img"
-            aria-label="Suasana kegiatan Mbatik Bareng di Kota Lama Semarang"
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/mbatik-bareng/mbatik-jalanan-02.webp"
+            alt="Kegiatan Mbatik Bareng Setitik"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ objectPosition: 'center' }}
           />
-        </motion.div>
+          <div className="absolute inset-0 bg-gradient-to-r from-forest via-forest/78 to-forest/15" />
+          <div className="absolute inset-5 rounded-[23px] border border-white/15 sm:inset-7" />
 
-        {/* ── Galeri — header stagger, lalu grid stagger ── */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: false, amount: 0.2, margin: "0px 0px -5% 0px" }}
-          className="mb-6"
-        >
-          <motion.p
-            variants={itemVariants}
-            className="font-sans text-xs uppercase tracking-[0.25em] text-stone mb-2"
-          >
-            Galeri
-          </motion.p>
-          <motion.h2
-            variants={itemVariants}
-            className="font-serif text-2xl text-ink mb-8"
-          >
-            Kegiatan sebelumnya
-          </motion.h2>
-        </motion.div>
+          <div className="relative z-10 flex min-h-[500px] max-w-[650px] flex-col justify-center p-7 sm:p-9 md:min-h-[540px] lg:p-10">
+            <motion.div variants={itemVariants} className="flex items-center gap-3">
+              <span className="h-px w-9 bg-brown" />
+              <p className="font-sans text-[10px] uppercase tracking-[0.25em] text-silk/55">
+                Kegiatan Setitik
+              </p>
+            </motion.div>
 
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: false, amount: 0.2, margin: "0px 0px -5% 0px" }}
-          className="grid grid-cols-2 gap-4 mb-24"
-        >
-          {galleryItems.map(({ id, caption, label }) => (
-            <motion.figure key={id} variants={itemVariants}>
-              <div
-                className="w-full aspect-[4/3] bg-sand rounded-sm mb-2"
-                role="img"
-                aria-label={label}
-              />
-              <figcaption className="font-sans text-xs text-stone">
-                {caption}
-              </figcaption>
-            </motion.figure>
-          ))}
-        </motion.div>
-
-        {/* ── Jadwal mendatang ── */}
-        <motion.div
-          variants={itemVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: false, amount: 0.2, margin: "0px 0px -5% 0px" }}
-          className="mb-8"
-        >
-          <h2 className="font-serif text-2xl text-ink">Jadwal mendatang</h2>
-        </motion.div>
-
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: false, amount: 0.2, margin: "0px 0px -5% 0px" }}
-          className="space-y-4 mb-24"
-        >
-          {events.map((event) => (
-            <motion.div
-              key={event.id}
+            <motion.h1
               variants={itemVariants}
-              className="border border-sand px-8 py-6 flex flex-col md:flex-row md:items-center justify-between gap-4"
+              className="mt-5 font-serif text-4xl leading-[0.98] text-silk md:text-5xl"
             >
-              <div>
-                <p className="font-serif text-lg text-ink">{event.displayDate}</p>
-                <p className="font-sans text-sm text-stone mt-1">
-                  {event.time} · {event.location}
+              Mbatik Bareng,
+              <span className="block italic text-brown">di jalanan Kota Lama.</span>
+            </motion.h1>
+
+            <motion.p
+              variants={itemVariants}
+              className="mt-4 max-w-lg font-sans text-sm leading-[1.75] text-silk/67"
+            >
+              Ruang belajar membatik bersama Setitik di tepi jalan Kota Lama
+              Semarang. Peserta tidak perlu memiliki pengalaman membatik sebelumnya.
+            </motion.p>
+
+            <motion.div variants={itemVariants} className="mt-4 flex flex-wrap gap-2">
+              {['Kamis minggu ketiga', '09.00-12.00 WIB', 'Taman Srigunting'].map((label) => (
+                <span
+                  key={label}
+                  className="rounded-full border border-silk/20 bg-forest/25 px-4 py-2.5 font-sans text-[8px] uppercase tracking-[0.14em] text-silk/60 backdrop-blur-md"
+                >
+                  {label}
+                </span>
+              ))}
+            </motion.div>
+
+            <motion.a
+              variants={itemVariants}
+              href="#pendaftaran"
+              className="mt-5 inline-flex self-start rounded-full bg-silk px-6 py-3 font-sans text-[9px] uppercase tracking-[0.17em] text-forest transition-colors hover:bg-brown hover:text-silk"
+            >
+              Lihat jadwal &amp; daftar
+            </motion.a>
+          </div>
+        </motion.section>
+
+        <motion.section
+          id="pendaftaran"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.16 }}
+          className="mt-5 grid overflow-hidden rounded-[30px] border border-sand/80 bg-silk shadow-[0_26px_80px_rgba(65,49,31,0.12)] md:mt-6 lg:grid-cols-[0.92fr_1.08fr]"
+        >
+          <div className="relative overflow-hidden bg-forest p-6 text-silk sm:p-7 lg:p-8">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/mbatik-bareng/mbatik-jalanan-05.webp"
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-luminosity"
+              style={{ objectPosition: 'center' }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-br from-forest via-forest/94 to-forest/74" />
+
+            <div className="relative z-10">
+              <motion.p
+                variants={itemVariants}
+                className="flex items-center gap-3 font-sans text-[9px] uppercase tracking-[0.22em] text-silk/55"
+              >
+                <Sparkles size={14} className="text-brown" aria-hidden />
+                Pendaftaran dibuka
+              </motion.p>
+              <motion.h2
+                variants={itemVariants}
+                className="mt-4 max-w-md font-serif text-3xl leading-tight text-silk md:text-4xl"
+              >
+                Ambil tempat di lingkar belajar berikutnya.
+              </motion.h2>
+              <motion.p
+                variants={itemVariants}
+                className="mt-3 max-w-md font-sans text-sm leading-[1.7] text-silk/66"
+              >
+                Datang, duduk bersama, lalu kenali proses membatik dari dekat.
+                Tim Setitik akan mendampingi dari pengenalan canting sampai proses awal di kain.
+              </motion.p>
+
+              <motion.div variants={itemVariants} className="mt-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+                {registrationNotes.map((note) => (
+                  <div
+                    key={note}
+                    className="flex items-center gap-3 rounded-2xl border border-silk/12 bg-silk/[0.06] px-4 py-2.5 backdrop-blur-md"
+                  >
+                    <CheckCircle2 size={15} className="shrink-0 text-brown" aria-hidden />
+                    <p className="font-sans text-xs leading-relaxed text-silk/72">{note}</p>
+                  </div>
+                ))}
+              </motion.div>
+
+              <motion.div variants={itemVariants} className="mt-5 border-t border-silk/15 pt-5">
+                <p className="font-sans text-[9px] uppercase tracking-[0.2em] text-silk/42">
+                  Jadwal terdekat
                 </p>
-              </div>
-              <div className="flex items-center gap-6">
-                <div className="text-right">
-                  <p className={`font-sans text-sm font-medium ${statusColor[event.status]}`}>
-                    {statusLabel[event.status]}
-                  </p>
-                  {event.status !== 'full' && (
-                    <p className="font-sans text-xs text-stone mt-0.5">
-                      {event.availableSlots} tempat tersisa
-                    </p>
+                <div className="mt-3 space-y-2">
+                  {upcomingEvents.length > 0 ? (
+                    upcomingEvents.slice(0, 2).map((event) => (
+                      <article
+                        key={event.id}
+                        className="rounded-[18px] border border-silk/14 bg-forest/35 p-3.5"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="font-serif text-xl leading-tight text-silk">{event.displayDate}</p>
+                            <p className="mt-2 flex items-center gap-2 font-sans text-xs text-silk/55">
+                              <Clock size={13} className="text-brown" aria-hidden />
+                              {event.time}
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-brown/45 px-3 py-1.5 font-sans text-[8px] uppercase tracking-[0.13em] text-brown">
+                            {event.status === 'open' ? 'Buka' : 'Segera'}
+                          </span>
+                        </div>
+                        <p className="mt-3 flex items-center gap-2 font-sans text-xs leading-relaxed text-silk/52">
+                          <MapPin size={13} className="shrink-0 text-brown" aria-hidden />
+                          {event.location}
+                        </p>
+                        <p className="mt-3 flex items-center gap-2 border-t border-silk/10 pt-3 font-sans text-[9px] text-silk/40">
+                          <Users size={13} aria-hidden />
+                          {event.availableSlots} tempat tersedia dari {event.totalSlots}
+                        </p>
+                      </article>
+                    ))
+                  ) : (
+                    <p className="font-serif text-xl text-silk">Jadwal berikutnya segera diumumkan.</p>
                   )}
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
+              </motion.div>
+            </div>
+          </div>
 
-        {/* ── Form pendaftaran — heading → deskripsi → form ── */}
-        <motion.div
+          <motion.div variants={itemVariants} className="p-6 sm:p-7 lg:p-8">
+            <div>
+              <div>
+                <p className="font-sans text-[9px] uppercase tracking-[0.22em] text-stone">
+                  Formulir pendaftaran
+                </p>
+                <h2 className="mt-3 font-serif text-3xl leading-tight text-ink md:text-4xl">
+                  Daftarkan diri
+                </h2>
+                <p className="mt-3 max-w-lg font-sans text-sm leading-relaxed text-stone">
+                  Pilih tanggal yang masih tersedia. Konfirmasi pendaftaran akan dikirim melalui WhatsApp.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleRegistrationSubmit} className="mt-5 grid gap-4 sm:grid-cols-2">
+              <FormField name="name" label="Nama lengkap" type="text" placeholder="Nama Anda" />
+              <FormField name="whatsapp" label="Nomor WhatsApp" type="tel" placeholder="08xx xxxx xxxx" />
+              <FormField name="email" label="Email" type="email" placeholder="email@contoh.com" />
+
+              <label className="block">
+                <span className="mb-2 block font-sans text-[9px] uppercase tracking-[0.17em] text-stone">
+                  Tanggal kegiatan
+                </span>
+                <select
+                  name="eventId"
+                  required
+                  defaultValue=""
+                  className="w-full rounded-xl border border-sand bg-cream px-4 py-3 font-sans text-sm text-ink outline-none transition-colors focus:border-brown"
+                >
+                  <option value="" disabled>Pilih tanggal</option>
+                  {openEvents.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.displayDate} - {event.availableSlots} tempat
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block font-sans text-[9px] uppercase tracking-[0.17em] text-stone">
+                  Jumlah peserta
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  name="participants"
+                  defaultValue={1}
+                  className="w-full rounded-xl border border-sand bg-cream px-4 py-3 font-sans text-sm text-ink outline-none transition-colors focus:border-brown"
+                />
+              </label>
+
+              <label className="block sm:col-span-2">
+                <span className="mb-2 block font-sans text-[9px] uppercase tracking-[0.17em] text-stone">
+                  Catatan tambahan
+                </span>
+                <textarea
+                  name="notes"
+                  rows={2}
+                  placeholder="Hal yang ingin disampaikan..."
+                  className="w-full resize-none rounded-xl border border-sand bg-cream px-4 py-3 font-sans text-sm text-ink outline-none transition-colors placeholder:text-stone/45 focus:border-brown"
+                />
+              </label>
+
+              {error && (
+                <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-sans text-sm leading-6 text-red-700 sm:col-span-2">
+                  {error}
+                </p>
+              )}
+              {message && (
+                <p className="rounded-xl border border-forest/20 bg-forest/5 px-4 py-3 font-sans text-sm leading-6 text-forest sm:col-span-2">
+                  {message}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={openEvents.length === 0 || submitting}
+                className="group inline-flex items-center justify-center gap-3 rounded-full bg-brown px-6 py-3.5 font-sans text-[9px] uppercase tracking-[0.17em] text-silk transition-colors hover:bg-forest disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
+              >
+                {submitting ? 'Mengirim pendaftaran...' : 'Saya ikut Mbatik Bareng'}
+                {submitting ? (
+                  <Loader2 size={14} className="animate-spin" aria-hidden />
+                ) : (
+                  <Send size={14} className="transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
+                )}
+              </button>
+            </form>
+          </motion.div>
+        </motion.section>
+
+        <motion.section
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
-          viewport={{ once: false, amount: 0.2, margin: "0px 0px -5% 0px" }}
+          viewport={{ once: true, amount: 0.12 }}
+          className="pb-10 pt-8 md:pb-12 md:pt-10"
         >
-          <motion.h2
-            variants={itemVariants}
-            className="font-serif text-2xl text-ink mb-3"
-          >
-            Daftarkan diri
-          </motion.h2>
-          <motion.p
-            variants={itemVariants}
-            className="font-sans text-sm text-stone mb-10"
-          >
-            Isi formulir di bawah ini. Kami akan mengirimkan konfirmasi melalui WhatsApp.
-          </motion.p>
-
-          <motion.form variants={itemVariants} className="space-y-6">
+          <motion.div variants={itemVariants} className="mb-6 grid gap-5 lg:grid-cols-[0.7fr_1fr] lg:items-end">
             <div>
-              <label className="block font-sans text-xs uppercase tracking-[0.2em] text-stone mb-2">
-                Nama Lengkap <span className="text-brown">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Nama Anda"
-                className="w-full border border-sand bg-silk px-4 py-3 font-sans text-sm text-ink placeholder:text-stone/50 focus:outline-none focus:border-brown transition-colors duration-300"
-              />
+              <p className="font-sans text-[10px] uppercase tracking-[0.22em] text-stone">
+                Dokumentasi
+              </p>
+              <h2 className="mt-3 font-serif text-4xl text-ink">Suasana Mbatik di Jalanan</h2>
             </div>
+            <p className="max-w-xl border-l border-brown/30 pl-5 font-sans text-sm leading-[1.8] text-stone">
+              Dari teras bangunan tua, kain display, sampai peserta yang duduk
+              melingkar, Mbatik Bareng dibuat sebagai ruang belajar yang dekat dengan kota.
+            </p>
+          </motion.div>
 
-            <div>
-              <label className="block font-sans text-xs uppercase tracking-[0.2em] text-stone mb-2">
-                Email <span className="text-brown">*</span>
-              </label>
-              <input
-                type="email"
-                required
-                placeholder="email@contoh.com"
-                className="w-full border border-sand bg-silk px-4 py-3 font-sans text-sm text-ink placeholder:text-stone/50 focus:outline-none focus:border-brown transition-colors duration-300"
-              />
-            </div>
-
-            <div>
-              <label className="block font-sans text-xs uppercase tracking-[0.2em] text-stone mb-2">
-                Nomor WhatsApp <span className="text-brown">*</span>
-              </label>
-              <input
-                type="tel"
-                required
-                placeholder="08xx xxxx xxxx"
-                className="w-full border border-sand bg-silk px-4 py-3 font-sans text-sm text-ink placeholder:text-stone/50 focus:outline-none focus:border-brown transition-colors duration-300"
-              />
-            </div>
-
-            <div>
-              <label className="block font-sans text-xs uppercase tracking-[0.2em] text-stone mb-2">
-                Tanggal Kegiatan <span className="text-brown">*</span>
-              </label>
-              <select
-                required
-                defaultValue=""
-                className="w-full border border-sand bg-silk px-4 py-3 font-sans text-sm text-ink focus:outline-none focus:border-brown transition-colors duration-300 appearance-none"
+          <div className="space-y-5">
+            {gallery.map((image, index) => (
+              <motion.figure
+                key={image.src}
+                variants={itemVariants}
+                className={`group grid overflow-hidden rounded-[28px] border border-sand bg-cream shadow-[0_18px_55px_rgba(65,49,31,0.08)] lg:grid-cols-[1.12fr_0.88fr] ${
+                  index % 2 === 1 ? 'lg:[&>div:first-child]:order-2' : ''
+                }`}
               >
-                <option value="" disabled>Pilih tanggal</option>
-                {events
-                  .filter((e) => e.status !== 'full' && e.status !== 'coming-soon')
-                  .map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.displayDate} — {e.availableSlots} tempat tersisa
-                    </option>
-                  ))}
-              </select>
-            </div>
+                <div className="relative min-h-[260px] overflow-hidden bg-sand md:min-h-[340px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={image.src}
+                    alt={image.alt}
+                    className="h-full w-full object-cover"
+                    style={{ objectPosition: image.position }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-forest/35 via-transparent to-transparent" />
+                </div>
 
-            <div>
-              <label className="block font-sans text-xs uppercase tracking-[0.2em] text-stone mb-2">
-                Jumlah Peserta <span className="text-brown">*</span>
-              </label>
-              <input
-                type="number"
-                required
-                min={1}
-                max={5}
-                defaultValue={1}
-                className="w-full border border-sand bg-silk px-4 py-3 font-sans text-sm text-ink focus:outline-none focus:border-brown transition-colors duration-300"
-              />
-            </div>
-
-            <div>
-              <label className="block font-sans text-xs uppercase tracking-[0.2em] text-stone mb-4">
-                Pernah membatik sebelumnya? <span className="text-brown">*</span>
-              </label>
-              <div className="flex gap-8">
-                {['Ya', 'Tidak'].map((option) => (
-                  <label key={option} className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="experience"
-                      value={option}
-                      className="accent-brown"
-                    />
-                    <span className="font-sans text-sm text-ink">{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block font-sans text-xs uppercase tracking-[0.2em] text-stone mb-2">
-                Catatan tambahan
-              </label>
-              <textarea
-                rows={4}
-                placeholder="Hal-hal yang ingin Anda sampaikan..."
-                className="w-full border border-sand bg-silk px-4 py-3 font-sans text-sm text-ink placeholder:text-stone/50 focus:outline-none focus:border-brown transition-colors duration-300 resize-none"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full font-sans text-sm tracking-wide bg-brown text-silk py-4 hover:bg-forest transition-colors duration-500 mt-4"
-            >
-              Saya Ikut Mbatik
-            </button>
-          </motion.form>
-        </motion.div>
-
+                <figcaption className="flex min-h-[210px] flex-col justify-between p-6 text-ink sm:p-7 lg:p-8">
+                  <div>
+                    <p className="flex items-center gap-3 font-sans text-[9px] uppercase tracking-[0.22em] text-brown">
+                      <span className="h-px w-9 bg-brown" />
+                      Dokumentasi {String(index + 1).padStart(2, '0')}
+                    </p>
+                    <p className="mt-6 max-w-sm font-serif text-3xl leading-tight md:text-4xl">
+                      {image.caption}
+                    </p>
+                  </div>
+                  <p className="mt-9 border-t border-brown/25 pt-5 font-sans text-sm leading-[1.8] text-stone">
+                    Bagian dari suasana Mbatik di Jalanan, ruang belajar terbuka yang mempertemukan
+                    proses membatik, peserta, dan bangunan Kota Lama.
+                  </p>
+                </figcaption>
+              </motion.figure>
+            ))}
+          </div>
+        </motion.section>
       </div>
     </div>
+  )
+}
+
+function FormField({
+  name,
+  label,
+  type,
+  placeholder,
+}: {
+  name: string
+  label: string
+  type: string
+  placeholder: string
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block font-sans text-[9px] uppercase tracking-[0.17em] text-stone">
+        {label}
+      </span>
+      <input
+        name={name}
+        type={type}
+        required
+        placeholder={placeholder}
+        className="w-full rounded-xl border border-sand bg-cream px-4 py-3 font-sans text-sm text-ink outline-none transition-colors placeholder:text-stone/45 focus:border-brown"
+      />
+    </label>
   )
 }

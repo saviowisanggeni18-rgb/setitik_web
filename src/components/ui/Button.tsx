@@ -45,7 +45,7 @@ export function buttonVariants({
   return cn(
     'inline-flex items-center justify-center',
     'font-sans tracking-wide rounded-sm',
-    'transition-colors duration-500',
+    'transition-colors duration-200',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brown/40',
     'disabled:opacity-50 disabled:pointer-events-none',
     variant === 'link' ? '' : sizeClasses[size],

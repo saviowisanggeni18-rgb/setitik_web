@@ -16,6 +16,13 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Admin Update Module
+
+Owner can manage homepage sections and publish photo updates from `/admin`.
+Homepage sections can be shown, hidden, reordered, and extended with custom content blocks.
+
+Setup notes are in [`docs/ADMIN_UPDATES.md`](docs/ADMIN_UPDATES.md).
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

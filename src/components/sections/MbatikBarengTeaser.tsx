@@ -13,13 +13,13 @@ export default function MbatikBarengTeaser() {
   )
 
   return (
-    <section className="py-24 px-6">
+    <section className="px-6 py-14 md:py-16">
       <div className="max-w-2xl mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: 28 }}
+          initial={{ opacity: 0, y: 8 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-60px' }}
-          transition={{ duration: 0.8, ease }}
+          transition={{ duration: 0.28, ease }}
           className="flex flex-col items-center text-center gap-6"
         >
           <p className="font-sans text-xs uppercase tracking-[0.25em] text-stone">

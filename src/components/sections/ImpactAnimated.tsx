@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
 import type { HomepageSection } from '@/lib/homepage-sections'
 
 const ease = [0.16, 1, 0.3, 1] as const
@@ -57,7 +58,37 @@ const impactFlow = [
   },
 ]
 
-export default function ImpactAnimated({ section }: { section?: HomepageSection }) {
+type ImpactImageState = { src: string; positionX: number; positionY: number; zoom: number }
+const impactContentMarker = '__SETITIK_IMPACT_CONTENT__:'
+const defaultImpactDescription = 'Setitik bekerja bersama komunitas dan pengrajin agar pelestarian budaya juga menghasilkan manfaat ekonomi yang nyata.'
+
+function readImpactContent(section?: HomepageSection) {
+  const raw = section?.description ?? ''
+  if (raw.startsWith(impactContentMarker)) {
+    try {
+      const parsed = JSON.parse(raw.slice(impactContentMarker.length)) as { description?: string; images?: Record<string, ImpactImageState> }
+      return { description: parsed.description || defaultImpactDescription, images: parsed.images || {} }
+    } catch {}
+  }
+  return { description: raw.trim() || defaultImpactDescription, images: {} as Record<string, ImpactImageState> }
+}
+
+function ImpactEditableImage({ image, alt, editing, compact = false, onChange, onUpload }: { image: ImpactImageState; alt: string; editing: boolean; compact?: boolean; onChange: (value: ImpactImageState) => void; onUpload?: (file: File) => Promise<string> }) {
+  const dragRef = useRef<{ x: number; y: number; positionX: number; positionY: number } | null>(null)
+  return <div className={`absolute inset-0 overflow-hidden ${editing ? 'cursor-grab touch-none overscroll-contain active:cursor-grabbing' : ''}`} onWheel={(event) => { if (!editing) return; event.preventDefault(); event.stopPropagation(); const zoom = Math.min(3, Math.max(1, image.zoom + (event.deltaY < 0 ? 0.1 : -0.1))); onChange({ ...image, zoom: Number(zoom.toFixed(2)) }) }} onPointerDown={(event) => { if (!editing || (event.target as Element).closest('label,input')) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); dragRef.current = { x: event.clientX, y: event.clientY, positionX: image.positionX, positionY: image.positionY } }} onPointerMove={(event) => { const drag = dragRef.current; if (!drag || !editing) return; const bounds = event.currentTarget.getBoundingClientRect(); onChange({ ...image, positionX: Number(Math.min(100, Math.max(0, drag.positionX - ((event.clientX - drag.x) / bounds.width) * 100)).toFixed(1)), positionY: Number(Math.min(100, Math.max(0, drag.positionY - ((event.clientY - drag.y) / bounds.height) * 100)).toFixed(1)) }) }} onPointerUp={(event) => { dragRef.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId) }} onPointerCancel={() => { dragRef.current = null }}>
+    {/* eslint-disable-next-line @next/next/no-img-element */}<img src={image.src} alt={alt} className="h-full w-full object-cover" style={{ objectPosition: `${image.positionX}% ${image.positionY}%`, transform: `scale(${image.zoom})`, transformOrigin: `${image.positionX}% ${image.positionY}%` }} />
+    {editing && onUpload && <label data-section-editor-control="true" className={`absolute right-3 top-3 z-30 cursor-pointer rounded-full border border-sand bg-silk/95 font-sans font-bold uppercase tracking-[0.1em] text-forest shadow-lg ${compact ? 'px-2.5 py-1.5 text-[8px]' : 'px-4 py-2 text-[10px]'}`}>{compact ? 'Ganti' : 'Ganti gambar'}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={async (event) => { const file = event.target.files?.[0]; if (file) onChange({ ...image, src: await onUpload(file) }); event.currentTarget.value = '' }} /></label>}
+    {editing && <span data-section-editor-control="true" className={`pointer-events-none absolute bottom-3 left-1/2 z-30 -translate-x-1/2 rounded-full bg-brown/90 font-sans font-semibold text-white shadow-lg ${compact ? 'px-2 py-1 text-[8px]' : 'px-4 py-2 text-[10px]'}`}>{compact ? 'Seret · scroll zoom' : 'Seret gambar · scroll untuk zoom'}</span>}
+  </div>
+}
+
+export default function ImpactAnimated({ section, editing = false, onContentChange, onImageUpload }: { section?: HomepageSection; editing?: boolean; onContentChange?: (value: string) => void; onImageUpload?: (file: File) => Promise<string> }) {
+  const initial = readImpactContent(section)
+  const [impactDescription, setImpactDescription] = useState(initial.description)
+  const [images, setImages] = useState(initial.images)
+  useEffect(() => { const next = readImpactContent(section); setImpactDescription(next.description); setImages(next.images) }, [section?.id, section?.description])
+  const getImage = (key: string, src: string, x = 50, y = 50): ImpactImageState => images[key] ?? { src, positionX: x, positionY: y, zoom: 1 }
+  const updateImage = (key: string, value: ImpactImageState) => { const next = { ...images, [key]: value }; setImages(next); onContentChange?.(`${impactContentMarker}${JSON.stringify({ description: impactDescription, images: next })}`) }
   return (
     <main className="overflow-hidden px-5 py-8 sm:px-6 md:py-12">
       <motion.section
@@ -68,14 +99,8 @@ export default function ImpactAnimated({ section }: { section?: HomepageSection 
       >
         <motion.div variants={itemVariants} className="relative min-h-[430px] p-7 sm:p-10 lg:min-h-[680px] lg:p-12">
           <div className="absolute inset-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={section?.imageUrl ?? '/images/mbatik-bareng/mbatik-jalanan-04.webp'}
-              alt="Kegiatan membatik bersama Setitik"
-              className="h-full w-full object-cover"
-              style={{ objectPosition: 'center 68%' }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-forest/55 via-forest/38 to-forest/90" />
+            <ImpactEditableImage image={getImage('hero', section?.imageUrl ?? '/images/mbatik-bareng/mbatik-jalanan-04.webp', 50, 68)} alt="Kegiatan membatik bersama Setitik" editing={editing} onChange={(value) => updateImage('hero', value)} onUpload={onImageUpload} />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-forest/55 via-forest/38 to-forest/90" />
           </div>
 
           <div className="relative z-10 flex h-full flex-col justify-between">
@@ -107,7 +132,7 @@ export default function ImpactAnimated({ section }: { section?: HomepageSection 
               <h2 className="mt-4 font-serif text-[38px] leading-[0.98] md:text-5xl">Dampak yang dikerjakan.</h2>
             </div>
             <p className="border-l border-brown/35 pl-5 font-sans text-sm leading-[1.8] text-stone">
-              {section?.description ?? 'Setitik bekerja bersama komunitas dan pengrajin agar pelestarian budaya juga menghasilkan manfaat ekonomi yang nyata.'}
+              {impactDescription}
             </p>
           </motion.div>
 
@@ -120,14 +145,8 @@ export default function ImpactAnimated({ section }: { section?: HomepageSection 
               >
                 {story.image && (
                   <div className="relative min-h-[230px] sm:min-h-[260px]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={story.image}
-                      alt={story.title}
-                      className="h-full w-full object-cover"
-                      style={{ objectPosition: story.position }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-forest/55 via-forest/5 to-transparent" />
+                    <ImpactEditableImage image={getImage(`story-${index}`, story.image, 50, Number.parseFloat(story.position.split(' ')[1]) || 50)} alt={story.title} editing={editing} compact onChange={(value) => updateImage(`story-${index}`, value)} onUpload={onImageUpload} />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-forest/55 via-forest/5 to-transparent" />
                     <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/30 bg-paper/92 px-3.5 py-2 font-sans text-[8px] uppercase tracking-[0.18em] text-stone shadow-sm backdrop-blur">
                       <span className="h-1.5 w-1.5 rounded-full bg-brown" />
                       {story.label}

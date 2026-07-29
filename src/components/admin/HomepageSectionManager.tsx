@@ -35,6 +35,7 @@ import CustomHomepageSection from '@/components/sections/CustomHomepageSection'
 import AboutAnimated from '@/components/sections/AboutAnimated'
 import ImpactAnimated from '@/components/sections/ImpactAnimated'
 import CollaborationEventsSection from '@/components/sections/CollaborationEventsSection'
+import { collectEditableTextElements, encodeSectionTextContent } from '@/lib/section-text-overrides'
 
 type Props = {
   password: string
@@ -92,6 +93,8 @@ function EditableSectionPreview({
   imageZoom,
   onImagePositionChange,
   onImageZoomChange,
+  textOverrides,
+  onTextOverridesChange,
 }: {
   section: HomepageSection
   editing: boolean
@@ -104,6 +107,8 @@ function EditableSectionPreview({
   imageZoom: number
   onImagePositionChange: (value: { x: number; y: number }) => void
   onImageZoomChange: (value: number) => void
+  textOverrides: Record<string, string>
+  onTextOverridesChange: (value: Record<string, string>) => void
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -120,43 +125,31 @@ function EditableSectionPreview({
     const root = rootRef.current
     if (!root) return
 
-    // Bagian arsip kolaborasi memiliki banyak kartu dan mengelola field editnya
-    // sendiri. Jangan tandai hanya heading/paragraf pertama sebagai field umum.
-    if (section.sectionKey === 'collaboration-events' || section.sectionKey === 'about-main') return
-
-    const heading = root.querySelector<HTMLElement>('h1, h2')
-    const paragraphs = [...root.querySelectorAll<HTMLElement>('p')]
-    const description =
-      paragraphs.find((item) => (item.textContent?.trim().length ?? 0) > 70) ??
-      [...paragraphs].sort(
-        (a, b) => (b.textContent?.trim().length ?? 0) - (a.textContent?.trim().length ?? 0)
-      )[0]
     const images = [...root.querySelectorAll<HTMLImageElement>('img')]
-    const eyebrow = root.querySelector<HTMLElement>('[data-homepage-eyebrow]')
-    const editableImages =
+    const usesSlotImageEditor =
       section.kind === 'custom'
+    const editableImages =
+      ['about-main', 'collaboration-events', 'impact-main'].includes(section.sectionKey ?? '') || usesSlotImageEditor
+        ? []
+        : section.kind === 'custom'
         ? images
         : [images.find((item) => section.imageUrl && item.src.endsWith(section.imageUrl)) ?? images[0]].filter(
             (item): item is HTMLImageElement => Boolean(item)
           )
 
-    const markText = (
-      element: HTMLElement | undefined | null,
-      field: 'title' | 'description' | 'eyebrow'
-    ) => {
-      if (!element) return
+    if (section.sectionKey !== 'collaboration-events') collectEditableTextElements(root).forEach((element, index) => {
+      const key = `text-${index}`
+      if (textOverrides[key] !== undefined && element.innerText !== textOverrides[key]) {
+        element.innerText = textOverrides[key]
+      }
       element.contentEditable = editing ? 'true' : 'false'
-      element.dataset.homepageField = field
+      element.dataset.sectionTextKey = key
       element.classList.toggle('cursor-text', editing)
       element.classList.toggle('outline', editing)
       element.classList.toggle('outline-2', editing)
       element.classList.toggle('outline-offset-4', editing)
       element.classList.toggle('outline-brown/70', editing)
-    }
-
-    markText(heading, 'title')
-    markText(description, 'description')
-    markText(eyebrow, 'eyebrow')
+    })
 
     editableImages.forEach((editableImage) => {
       editableImage.dataset.homepageImage = 'true'
@@ -178,7 +171,7 @@ function EditableSectionPreview({
         imageContainer.classList.toggle('ring-inset', editing)
       }
     })
-  }, [children, editing, section.imageUrl, section.kind, section.sectionKey])
+  }, [children, editing, section.imageUrl, section.kind, section.sectionKey, textOverrides])
 
   useEffect(() => {
     const root = rootRef.current
@@ -207,6 +200,8 @@ function EditableSectionPreview({
         if (!editing) return
         const target = event.target as HTMLElement
         const value = target.innerText.trim()
+        const textKey = target.dataset.sectionTextKey
+        if (textKey) onTextOverridesChange({ ...textOverrides, [textKey]: value })
         if (target.dataset.homepageField === 'title') onTitleChange(value)
         if (target.dataset.homepageField === 'description') onDescriptionChange(value)
         if (target.dataset.homepageField === 'eyebrow') onEyebrowChange(value)
@@ -276,12 +271,12 @@ function EditableSectionPreview({
           event.target.value = ''
         }}
       />
-      {editing && (
+      {editing && !['about-main', 'collaboration-events', 'impact-main'].includes(section.sectionKey ?? '') && section.kind !== 'custom' && (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-20 z-40 mx-auto w-fit rounded-full bg-brown px-4 py-2 text-xs font-semibold text-silk shadow-xl">
+          <div data-section-editor-control="true" className="pointer-events-none absolute inset-x-0 top-20 z-40 mx-auto w-fit rounded-full bg-brown px-4 py-2 text-xs font-semibold text-silk shadow-xl">
             Seret gambar untuk menggeser · scroll untuk zoom
           </div>
-          <button
+          <button data-section-editor-control="true"
             type="button"
             onClick={() => inputRef.current?.click()}
             className="absolute right-4 top-4 z-50 inline-flex h-10 items-center gap-2 rounded-full border border-sand bg-silk/95 px-4 text-xs font-semibold text-forest shadow-xl backdrop-blur transition hover:bg-brown hover:text-silk"
@@ -377,11 +372,11 @@ function renderHomepageSection(
     case 'about-main':
       return <AboutAnimated section={section} editing={options?.editing} onTitleChange={options?.onTitleChange} onContentChange={options?.onContentChange} onImageUpload={options?.onImageUpload} />
     case 'impact-main':
-      return <ImpactAnimated section={section} />
+      return <ImpactAnimated section={section} editing={options?.editing} onContentChange={options?.onContentChange} onImageUpload={options?.onImageUpload} />
     case 'collaboration-events':
       return <CollaborationEventsSection section={section} editing={options?.editing} onTitleChange={options?.onTitleChange} onContentChange={options?.onContentChange} onImageUpload={options?.onImageUpload} />
     default:
-      return <CustomHomepageSection section={section} />
+      return <CustomHomepageSection section={section} editing={options?.editing} onContentChange={options?.onContentChange} onImageUpload={options?.onImageUpload} />
   }
 }
 
@@ -403,6 +398,7 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
   const [template, setTemplate] = useState<HomepageSectionTemplate | null>(null)
   const [imagePosition, setImagePosition] = useState({ x: 50, y: 50 })
   const [imageZoom, setImageZoom] = useState(1)
+  const [textOverrides, setTextOverrides] = useState<Record<string, string>>({})
   const requiredSectionSyncAttempted = useRef(false)
 
   const orderedSections = useMemo(() => {
@@ -620,7 +616,7 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
     const formData = new FormData()
     formData.set('password', password)
     formData.set('title', title.trim())
-    formData.set('description', description.trim())
+    formData.set('description', encodeSectionTextContent(description.trim(), textOverrides))
     formData.set('label', eyebrow.trim() || defaultSectionEyebrow(page))
     formData.set('page', page)
     formData.set('template', template ?? 'editorial')
@@ -656,6 +652,7 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
       setTemplate(null)
       setImagePosition({ x: 50, y: 50 })
       setImageZoom(1)
+      setTextOverrides({})
       setMessage(
         editingId
           ? 'Isi bagian berhasil diperbarui di beranda.'
@@ -672,6 +669,7 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
     setEditingId(section.id)
     setTitle(section.title)
     setDescription(section.description)
+    setTextOverrides(section.textOverrides ?? {})
     setEyebrow(
       section.label.trim().toLowerCase() === section.title.trim().toLowerCase()
         ? defaultSectionEyebrow(page)
@@ -922,8 +920,13 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
                     imageZoom={imageZoom}
                     onImagePositionChange={setImagePosition}
                     onImageZoomChange={setImageZoom}
+                    textOverrides={textOverrides}
+                    onTextOverridesChange={setTextOverrides}
                   >
                     <CustomHomepageSection
+                      editing
+                      onContentChange={setDescription}
+                      onImageUpload={uploadCollaborationImage}
                       section={{
                         id: 'new-section-preview',
                         sectionKey: null,
@@ -1094,6 +1097,8 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
                     imageZoom={imageZoom}
                     onImagePositionChange={setImagePosition}
                     onImageZoomChange={setImageZoom}
+                    textOverrides={textOverrides}
+                    onTextOverridesChange={setTextOverrides}
                   >
                     {renderHomepageSection(previewSection, {
                       editing: editingId === section.id,

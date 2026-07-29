@@ -125,3 +125,62 @@ export async function POST(request: Request) {
     events: eventsResult.data ?? [],
   })
 }
+
+export async function DELETE(request: Request) {
+  if (!isAdminPasswordConfigured()) {
+    return NextResponse.json({ message: 'Password admin belum dikonfigurasi.' }, { status: 503 })
+  }
+  if (!isAdminPasswordValid(request.headers.get('x-admin-password'))) {
+    return NextResponse.json({ message: 'Password admin tidak sesuai.' }, { status: 401 })
+  }
+
+  const supabase = getSupabaseAdmin()
+  if (!supabase) return NextResponse.json({ message: 'Supabase admin belum dikonfigurasi.' }, { status: 503 })
+
+  try {
+    const body = await request.json() as {
+      registrationId?: string
+      eventId?: string | null
+      eventDate?: string
+      eventLabel?: string
+    }
+
+    let lookup = supabase
+      .from('mbatik_registrations')
+      .select('id,event_id,participants')
+
+    if (body.registrationId) {
+      lookup = lookup.eq('id', body.registrationId)
+    } else if (body.eventId) {
+      lookup = lookup.eq('event_id', body.eventId)
+    } else if (body.eventDate && body.eventLabel) {
+      lookup = lookup.eq('event_date', body.eventDate).eq('event_label', body.eventLabel)
+    } else {
+      return NextResponse.json({ message: 'Data histori yang akan dihapus tidak ditemukan.' }, { status: 400 })
+    }
+
+    const { data: rows, error: lookupError } = await lookup
+    if (lookupError) throw new Error(lookupError.message)
+    const ids = (rows ?? []).map((row) => row.id as string)
+    if (ids.length === 0) return NextResponse.json({ deleted: 0 })
+
+    const { error: deleteError } = await supabase.from('mbatik_registrations').delete().in('id', ids)
+    if (deleteError) throw new Error(deleteError.message)
+
+    // Jika event masih aktif, penghapusan pendaftaran juga mengembalikan kuotanya.
+    const restoredByEvent = (rows ?? []).reduce<Record<string, number>>((result, row) => {
+      if (typeof row.event_id === 'string') result[row.event_id] = (result[row.event_id] ?? 0) + Number(row.participants || 0)
+      return result
+    }, {})
+    for (const [eventId, restored] of Object.entries(restoredByEvent)) {
+      const { data: event } = await supabase.from('mbatik_events').select('available_slots,total_slots').eq('id', eventId).maybeSingle()
+      if (event) {
+        await supabase.from('mbatik_events').update({ available_slots: Math.min(event.total_slots, event.available_slots + restored) }).eq('id', eventId)
+      }
+    }
+
+    return NextResponse.json({ deleted: ids.length })
+  } catch (error) {
+    return NextResponse.json({ message: error instanceof Error ? error.message : 'Gagal menghapus histori.' }, { status: 500 })
+  }
+}

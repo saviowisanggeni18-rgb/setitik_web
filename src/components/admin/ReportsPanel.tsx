@@ -9,6 +9,7 @@ import {
   Mail,
   Phone,
   RefreshCcw,
+  Trash2,
   Users,
 } from 'lucide-react'
 
@@ -42,6 +43,7 @@ export default function ReportsPanel({ password }: { password: string }) {
   const [registrations, setRegistrations] = useState<Registration[]>([])
   const [reportEvents, setReportEvents] = useState<ReportEvent[]>([])
   const [expandedEventKeys, setExpandedEventKeys] = useState<Set<string>>(new Set())
+  const [deletingKey, setDeletingKey] = useState('')
 
   const loadReport = useCallback(async function loadReport() {
     const formData = new FormData()
@@ -108,6 +110,26 @@ export default function ReportsPanel({ password }: { password: string }) {
       else next.add(key)
       return next
     })
+  }
+
+  async function deleteHistory(payload: Record<string, string | null>, key: string, label: string) {
+    if (!window.confirm(`Hapus ${label}? Data yang sudah dihapus tidak dapat dikembalikan.`)) return
+    setDeletingKey(key)
+    setError('')
+    try {
+      const response = await fetch('/api/admin-reports', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify(payload),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.message ?? 'Gagal menghapus histori.')
+      await loadReport()
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Gagal menghapus histori.')
+    } finally {
+      setDeletingKey('')
+    }
   }
 
   useEffect(() => {
@@ -203,12 +225,8 @@ export default function ReportsPanel({ password }: { password: string }) {
 
               return (
                 <article key={group.key} className="overflow-hidden border border-sand bg-cream">
-                  <button
-                    type="button"
-                    onClick={() => toggleEvent(group.key)}
-                    aria-expanded={expanded}
-                    className="flex w-full flex-wrap items-center justify-between gap-3 bg-forest px-5 py-4 text-left text-silk transition hover:bg-forest/95"
-                  >
+                  <div className="flex bg-forest text-silk">
+                  <button type="button" onClick={() => toggleEvent(group.key)} aria-expanded={expanded} className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-white/5">
                     <div>
                       <p className="text-[0.6rem] uppercase tracking-[0.2em] text-silk/50">Event Mbatik Bareng</p>
                       <h3 className="mt-1 font-serif text-2xl">{group.label}</h3>
@@ -234,6 +252,22 @@ export default function ReportsPanel({ password }: { password: string }) {
                       </span>
                     </div>
                   </button>
+                  <button
+                    type="button"
+                    disabled={deletingKey === `event:${group.key}`}
+                    onClick={() => void deleteHistory(
+                      group.registrations[0]?.event_id
+                        ? { eventId: group.registrations[0].event_id }
+                        : { eventId: null, eventDate: group.date, eventLabel: group.label },
+                      `event:${group.key}`,
+                      `seluruh histori event “${group.label}”`,
+                    )}
+                    className="m-3 inline-flex shrink-0 items-center gap-2 rounded-full border border-red-200/40 bg-red-500/10 px-3 text-[0.62rem] font-semibold uppercase tracking-[.12em] text-red-100 transition hover:bg-red-500/25 disabled:opacity-50"
+                  >
+                    {deletingKey === `event:${group.key}` ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    Hapus histori
+                  </button>
+                  </div>
 
                   {expanded ? <div className="overflow-x-auto">
                     <table className="w-full min-w-[820px] border-collapse text-left">
@@ -244,6 +278,7 @@ export default function ReportsPanel({ password }: { password: string }) {
                           <th className="px-4 py-3 text-center font-semibold">Peserta</th>
                           <th className="px-4 py-3 font-semibold">Catatan</th>
                           <th className="px-5 py-3 font-semibold">Waktu daftar</th>
+                          <th className="px-4 py-3 text-center font-semibold">Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -263,6 +298,17 @@ export default function ReportsPanel({ password }: { password: string }) {
                                 dateStyle: 'medium',
                                 timeStyle: 'short',
                               }).format(new Date(registration.created_at))}
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              <button
+                                type="button"
+                                disabled={deletingKey === registration.id}
+                                onClick={() => void deleteHistory({ registrationId: registration.id }, registration.id, `pendaftaran ${registration.name}`)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                                aria-label={`Hapus pendaftaran ${registration.name}`}
+                              >
+                                {deletingKey === registration.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                              </button>
                             </td>
                           </tr>
                         ))}

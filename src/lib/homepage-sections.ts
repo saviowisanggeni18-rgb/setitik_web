@@ -4,6 +4,7 @@ import {
   isSiteUpdateModuleConfigured,
   uploadSiteImage,
 } from '@/lib/site-updates'
+import { decodeSectionTextContent } from '@/lib/section-text-overrides'
 
 export type BuiltInSectionKey =
   | 'hero'
@@ -48,6 +49,7 @@ export type HomepageSection = {
   createdAt: string
   page?: 'home' | 'about' | 'impact'
   template?: HomepageSectionTemplate
+  textOverrides?: Record<string, string>
 }
 
 type HomepageSectionRow = {
@@ -257,13 +259,15 @@ export const defaultHomepageSections: HomepageSection[] = [
 
 function toHomepageSection(row: HomepageSectionRow): HomepageSection {
   const storedTransform = transformFromSectionKey(row.section_key)
+  const decodedContent = decodeSectionTextContent(row.description)
   return {
     id: row.id,
     sectionKey: row.section_key,
     kind: row.kind,
     label: row.label,
     title: row.title,
-    description: row.description,
+    description: decodedContent.description,
+    textOverrides: decodedContent.textOverrides,
     imageUrl: row.image_url,
     imagePath: row.image_path,
     imagePositionX: row.image_position_x ?? storedTransform.x,

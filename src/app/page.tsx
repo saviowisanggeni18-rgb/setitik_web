@@ -11,6 +11,7 @@ import TargetedUpdatesSection from '@/components/sections/TargetedUpdatesSection
 import { listHomepageSections, type HomepageSection } from '@/lib/homepage-sections'
 import { listMbatikEvents, type MbatikEvent } from '@/lib/mbatik-events'
 import SectionReveal from '@/components/animations/SectionReveal'
+import SectionTextOverrides from '@/components/sections/SectionTextOverrides'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,7 +66,9 @@ export default async function Home() {
           direction={index % 3 === 1 ? 'left' : index % 3 === 2 ? 'right' : 'up'}
           showDivider={index > 0}
         >
-          {renderSection(section, mbatikEvents)}
+          <SectionTextOverrides section={section}>
+            {renderSection(section, mbatikEvents)}
+          </SectionTextOverrides>
         </SectionReveal>
       ))}
     </>

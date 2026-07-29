@@ -186,28 +186,34 @@ const defaultEvents: EventGroup[] = [
 const collaborationContentMarker = '__SETITIK_COLLABORATION_CONTENT__:'
 const defaultIntroDescription =
   'Dokumentasi presentasi, fashion show, kolaborasi seni, seragam institusi, dan pameran. Semua ditata sebagai arsip acara yang jelas, rapi, dan mudah dibaca di desktop maupun HP.'
+const defaultArchiveEyebrow = 'Kolaborasi, acara, dan klien'
+const defaultSpotlightLabel = 'Spotlight'
 
 function readCollaborationContent(description?: string) {
   if (!description?.startsWith(collaborationContentMarker)) {
-    return { introDescription: defaultIntroDescription, events: defaultEvents }
+    return { introDescription: defaultIntroDescription, events: defaultEvents, eyebrow: defaultArchiveEyebrow, spotlightLabel: defaultSpotlightLabel }
   }
 
   try {
     const parsed = JSON.parse(description.slice(collaborationContentMarker.length)) as {
       introDescription?: string
       events?: EventGroup[]
+      eyebrow?: string
+      spotlightLabel?: string
     }
     return {
       introDescription: parsed.introDescription || defaultIntroDescription,
       events: Array.isArray(parsed.events) && parsed.events.length > 0 ? parsed.events : defaultEvents,
+      eyebrow: parsed.eyebrow || defaultArchiveEyebrow,
+      spotlightLabel: parsed.spotlightLabel || defaultSpotlightLabel,
     }
   } catch {
-    return { introDescription: defaultIntroDescription, events: defaultEvents }
+    return { introDescription: defaultIntroDescription, events: defaultEvents, eyebrow: defaultArchiveEyebrow, spotlightLabel: defaultSpotlightLabel }
   }
 }
 
-function serializeCollaborationContent(introDescription: string, events: EventGroup[]) {
-  return `${collaborationContentMarker}${JSON.stringify({ introDescription, events })}`
+function serializeCollaborationContent(introDescription: string, events: EventGroup[], eyebrow: string, spotlightLabel: string) {
+  return `${collaborationContentMarker}${JSON.stringify({ introDescription, events, eyebrow, spotlightLabel })}`
 }
 
 const editingClass = 'cursor-text outline outline-2 outline-offset-4 outline-[#9a743c]/70'
@@ -219,6 +225,7 @@ function Photo({
   editing = false,
   onImageChange,
   onTransformChange,
+  compactControls = false,
 }: {
   image: EventImage
   className?: string
@@ -226,6 +233,7 @@ function Photo({
   editing?: boolean
   onImageChange?: (file: File) => void
   onTransformChange?: (transform: { positionX: number; positionY: number; zoom: number }) => void
+  compactControls?: boolean
 }) {
   const dragRef = useRef<{ x: number; y: number; positionX: number; positionY: number } | null>(null)
   const legacyPosition = image.position?.split(' ') ?? []
@@ -283,12 +291,12 @@ function Photo({
         }}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-[#14251c]/55 via-transparent to-transparent" />
-      <span className="absolute left-4 top-4 rounded-full border border-white/30 bg-white/90 px-3 py-1.5 text-[0.58rem] font-semibold uppercase tracking-[0.22em] text-[#203829] shadow-sm backdrop-blur">
+      <span className={`absolute z-10 rounded-full border border-white/30 bg-white/90 font-semibold uppercase text-[#203829] shadow-sm backdrop-blur ${compactControls ? 'left-2 top-2 max-w-[58%] truncate px-2 py-1 text-[0.46rem] tracking-[0.12em]' : 'left-4 top-4 px-3 py-1.5 text-[0.58rem] tracking-[0.22em]'}`}>
         {image.label}
       </span>
       {editing && onImageChange && (
-        <label className="absolute right-3 top-3 z-20 cursor-pointer rounded-full border border-[#d8c8b3] bg-[#fbf7ef] px-3 py-2 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-[#203829] shadow-lg transition hover:bg-white">
-          Ganti gambar
+        <label data-section-editor-control="true" className={`absolute z-20 cursor-pointer rounded-full border border-[#d8c8b3] bg-[#fbf7ef] font-bold uppercase text-[#203829] shadow-lg transition hover:bg-white ${compactControls ? 'right-2 top-2 px-2.5 py-1.5 text-[0.48rem] tracking-[0.08em]' : 'right-3 top-3 px-3 py-2 text-[0.62rem] tracking-[0.12em]'}`}>
+          {compactControls ? 'Ganti' : 'Ganti gambar'}
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
@@ -302,8 +310,8 @@ function Photo({
         </label>
       )}
       {editing && (
-        <span className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#9a743c] px-3 py-1.5 text-[0.58rem] font-semibold text-white shadow-lg">
-          Seret untuk menggeser · scroll untuk zoom
+        <span data-section-editor-control="true" className={`pointer-events-none absolute z-20 font-semibold text-white shadow-lg ${compactControls ? 'inset-x-2 bottom-2 rounded-md bg-[#203829]/80 px-2 py-1 text-center text-[0.46rem] tracking-[0.02em] backdrop-blur-sm' : 'bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-[#9a743c] px-3 py-1.5 text-[0.58rem]'}`}>
+          {compactControls ? 'Seret · scroll zoom' : 'Seret gambar untuk menggeser · scroll untuk zoom'}
         </span>
       )}
     </figure>
@@ -343,6 +351,7 @@ function ArchiveCard({
                     editing={editing}
                     onImageChange={(file) => onImageChange(supportingIndex + 1, file)}
                     onTransformChange={(transform) => onTransformChange(supportingIndex + 1, transform)}
+                    compactControls
                     className={`${image.orientation === 'portrait' ? 'aspect-[4/5]' : 'aspect-[16/8.5]'} rounded-[1.15rem] lg:h-full lg:aspect-auto`}
                   />
                 ))}
@@ -413,16 +422,20 @@ export default function CollaborationEventsSection({
   const initialContent = readCollaborationContent(section?.description)
   const [introDescription, setIntroDescription] = useState(initialContent.introDescription)
   const [eventList, setEventList] = useState(initialContent.events)
+  const [archiveEyebrow, setArchiveEyebrow] = useState(initialContent.eyebrow)
+  const [spotlightLabel, setSpotlightLabel] = useState(initialContent.spotlightLabel)
 
   useEffect(() => {
     const content = readCollaborationContent(section?.description)
     setIntroDescription(content.introDescription)
     setEventList(content.events)
+    setArchiveEyebrow(content.eyebrow)
+    setSpotlightLabel(content.spotlightLabel)
   }, [section?.id, section?.description])
 
   const updateIntro = (value: string) => {
     setIntroDescription(value)
-    onContentChange?.(serializeCollaborationContent(value, eventList))
+    onContentChange?.(serializeCollaborationContent(value, eventList, archiveEyebrow, spotlightLabel))
   }
 
   const updateEvent = (
@@ -434,7 +447,7 @@ export default function CollaborationEventsSection({
       const next = current.map((event, index) =>
         index === eventIndex ? { ...event, [field]: value } : event
       )
-      onContentChange?.(serializeCollaborationContent(introDescription, next))
+      onContentChange?.(serializeCollaborationContent(introDescription, next, archiveEyebrow, spotlightLabel))
       return next
     })
   }
@@ -452,7 +465,7 @@ export default function CollaborationEventsSection({
           ),
         }
       })
-      onContentChange?.(serializeCollaborationContent(introDescription, next))
+      onContentChange?.(serializeCollaborationContent(introDescription, next, archiveEyebrow, spotlightLabel))
       return next
     })
   }
@@ -472,9 +485,45 @@ export default function CollaborationEventsSection({
           ),
         }
       })
-      onContentChange?.(serializeCollaborationContent(introDescription, next))
+      onContentChange?.(serializeCollaborationContent(introDescription, next, archiveEyebrow, spotlightLabel))
       return next
     })
+  }
+
+  const addArchiveEvent = () => {
+    const next = [...eventList, {
+      title: 'Judul kolaborasi baru',
+      year: String(new Date().getFullYear()),
+      type: 'Kolaborasi baru',
+      description: 'Klik teks ini untuk menuliskan cerita kolaborasi atau kegiatan terbaru Setitik.',
+      images: [{
+        src: '/images/editorial/founder-canting.webp',
+        alt: 'Dokumentasi kolaborasi baru Setitik',
+        label: 'Dokumentasi',
+        positionX: 50,
+        positionY: 50,
+        zoom: 1,
+      }],
+    }]
+    setEventList(next)
+    onContentChange?.(serializeCollaborationContent(introDescription, next, archiveEyebrow, spotlightLabel))
+  }
+
+  const removeLastAddedEvent = () => {
+    if (eventList.length <= defaultEvents.length) return
+    const next = eventList.slice(0, -1)
+    setEventList(next)
+    onContentChange?.(serializeCollaborationContent(introDescription, next, archiveEyebrow, spotlightLabel))
+  }
+
+  const moveArchiveEvent = (eventIndex: number, direction: -1 | 1) => {
+    const targetIndex = eventIndex + direction
+    // Indeks 0 adalah spotlight utama dan sengaja dibuat tetap.
+    if (eventIndex < 1 || targetIndex < 1 || targetIndex >= eventList.length) return
+    const next = [...eventList]
+    ;[next[eventIndex], next[targetIndex]] = [next[targetIndex], next[eventIndex]]
+    setEventList(next)
+    onContentChange?.(serializeCollaborationContent(introDescription, next, archiveEyebrow, spotlightLabel))
   }
 
   const [spotlight, ...archive] = eventList
@@ -486,9 +535,9 @@ export default function CollaborationEventsSection({
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 grid gap-5 border-b border-[#d8c8b3] pb-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
           <div>
-            <p className="mb-4 flex items-center gap-3 text-[0.65rem] font-semibold uppercase tracking-[0.32em] text-[#9a743c]">
+            <p contentEditable={editing} suppressContentEditableWarning onBlur={(event) => { const value = event.currentTarget.innerText.trim(); setArchiveEyebrow(value); onContentChange?.(serializeCollaborationContent(introDescription, eventList, value, spotlightLabel)) }} className={`mb-4 flex items-center gap-3 text-[0.65rem] font-semibold uppercase tracking-[0.32em] text-[#9a743c] ${editing ? editingClass : ''}`}>
               <span className="h-px w-9 bg-[#9a743c]" />
-              Kolaborasi, acara, dan klien
+              {archiveEyebrow}
             </p>
             <h2
               contentEditable={editing}
@@ -525,7 +574,7 @@ export default function CollaborationEventsSection({
             <div className="flex flex-col gap-6 px-1 pb-2 sm:px-2 lg:px-0 lg:py-3">
               <div>
                 <p className="mb-5 text-[0.62rem] font-semibold uppercase tracking-[0.28em] text-[#d5b075]">
-                  Spotlight{' '}
+                  <span contentEditable={editing} suppressContentEditableWarning onBlur={(event) => { const value = event.currentTarget.innerText.trim(); setSpotlightLabel(value); onContentChange?.(serializeCollaborationContent(introDescription, eventList, archiveEyebrow, value)) }} className={editing ? editingClass : ''}>{spotlightLabel}</span>{' '}
                   <span contentEditable={editing} suppressContentEditableWarning onBlur={(event) => updateEvent(0, 'year', event.currentTarget.innerText.trim())} className={editing ? editingClass : ''}>{spotlight.year}</span>
                 </p>
                 <h3 contentEditable={editing} suppressContentEditableWarning onBlur={(event) => updateEvent(0, 'title', event.currentTarget.innerText.trim())} className={`font-serif text-4xl leading-[1.02] sm:text-5xl lg:text-[3.15rem] ${editing ? editingClass : ''}`}>{spotlight.title}</h3>
@@ -540,6 +589,7 @@ export default function CollaborationEventsSection({
                     editing={editing}
                     onImageChange={(file) => void updateEventImage(0, imageIndex + 1, file)}
                     onTransformChange={(transform) => updateEventImageTransform(0, imageIndex + 1, transform)}
+                    compactControls
                     className={`${
                       image.orientation === 'portrait'
                         ? 'mx-auto aspect-[4/5] w-full max-w-[16rem] sm:max-w-[18rem] lg:max-w-[17rem]'
@@ -554,8 +604,30 @@ export default function CollaborationEventsSection({
 
         <div className="mt-8 space-y-7">
           {archive.map((event, index) => (
-            <ArchiveCard key={`${index}-${event.title}`} event={event} index={index} editing={editing} onChange={(field, value) => updateEvent(index + 1, field, value)} onImageChange={(imageIndex, file) => void updateEventImage(index + 1, imageIndex, file)} onTransformChange={(imageIndex, transform) => updateEventImageTransform(index + 1, imageIndex, transform)} />
+            <div key={`${index}-${event.title}`} className="relative">
+              {editing && (
+                <div data-section-editor-control="true" className="absolute right-6 top-3 z-50 flex overflow-hidden rounded-full border border-[#d8c8b3] bg-white/95 text-[0.58rem] font-bold uppercase tracking-[0.08em] text-[#203829] shadow-lg backdrop-blur">
+                  <button type="button" disabled={index === 0} onClick={() => moveArchiveEvent(index + 1, -1)} className="border-r border-[#d8c8b3] px-3 py-2 transition hover:bg-[#203829] hover:text-white disabled:cursor-not-allowed disabled:opacity-35">
+                    ↑ Naik
+                  </button>
+                  <button type="button" disabled={index === archive.length - 1} onClick={() => moveArchiveEvent(index + 1, 1)} className="px-3 py-2 transition hover:bg-[#203829] hover:text-white disabled:cursor-not-allowed disabled:opacity-35">
+                    ↓ Turun
+                  </button>
+                </div>
+              )}
+              <ArchiveCard event={event} index={index} editing={editing} onChange={(field, value) => updateEvent(index + 1, field, value)} onImageChange={(imageIndex, file) => void updateEventImage(index + 1, imageIndex, file)} onTransformChange={(imageIndex, transform) => updateEventImageTransform(index + 1, imageIndex, transform)} />
+              {editing && index === archive.length - 1 && eventList.length > defaultEvents.length && (
+                <button type="button" data-section-editor-control="true" onClick={removeLastAddedEvent} className="absolute bottom-4 right-4 z-40 rounded-full border border-red-300 bg-white/95 px-4 py-2 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-red-600 shadow-lg transition hover:bg-red-600 hover:text-white">
+                  Batalkan / hapus arsip
+                </button>
+              )}
+            </div>
           ))}
+          {editing && (
+            <button type="button" data-section-editor-control="true" onClick={addArchiveEvent} className="flex h-14 w-full items-center justify-center rounded-[1.5rem] border border-dashed border-[#9a743c] bg-[#fbf7ef] text-xs font-bold uppercase tracking-[0.16em] text-[#203829] transition hover:bg-[#9a743c] hover:text-white">
+              + Tambah arsip / kolaborasi
+            </button>
+          )}
         </div>
       </div>
     </section>

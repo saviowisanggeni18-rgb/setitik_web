@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2, Clock, Loader2, MapPin, Send, Sparkles, Users } from 'lucide-react'
 import type { MbatikEvent } from '@/lib/mbatik-events'
+import type { MbatikPageContent } from '@/lib/mbatik-page-content'
 
 const ease = [0.16, 1, 0.3, 1] as const
 
@@ -17,52 +18,13 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.28, ease } },
 }
 
-const gallery = [
-  {
-    src: '/images/mbatik-bareng/mbatik-jalanan-02.webp',
-    alt: 'Peserta Mbatik di Jalanan di depan bangunan Kota Lama',
-    caption: 'Belajar di teras kota',
-    position: 'center',
-  },
-  {
-    src: '/images/mbatik-bareng/mbatik-jalanan-01.webp',
-    alt: 'Peserta Mbatik di Jalanan berfoto di depan Gedung Marba',
-    caption: 'Kota Lama sebagai ruang belajar',
-    position: 'center 60%',
-  },
-  {
-    src: '/images/mbatik-bareng/mbatik-jalanan-03.webp',
-    alt: 'Peserta belajar mencanting bersama',
-    caption: 'Mengenal canting dan malam',
-    position: 'center',
-  },
-  {
-    src: '/images/mbatik-bareng/mbatik-jalanan-04.webp',
-    alt: 'Peserta membatik bersama di tepi jalan Kota Lama',
-    caption: 'Membatik di bawah cahaya sore',
-    position: 'center',
-  },
-  {
-    src: '/images/mbatik-bareng/mbatik-jalanan-05.webp',
-    alt: 'Display kain dan peserta Mbatik di Jalanan',
-    caption: 'Motif Setitik hadir di jalanan',
-    position: 'center',
-  },
-  {
-    src: '/images/mbatik-bareng/membatik-bersama-01.webp',
-    alt: 'Peserta mengerjakan kain batik bersama',
-    caption: 'Proses kecil yang saling dibantu',
-    position: 'center 72%',
-  },
-]
-
 const registrationNotes = [
   'Pemula boleh ikut',
   'Alat disiapkan',
   'Belajar langsung di Kota Lama',
 ]
 
-export default function MbatikBarengAnimated({ events }: { events: MbatikEvent[] }) {
+export default function MbatikBarengAnimated({ events, content }: { events: MbatikEvent[]; content: MbatikPageContent }) {
   const [upcomingEvents, setUpcomingEvents] = useState(events)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
@@ -135,10 +97,10 @@ export default function MbatikBarengAnimated({ events }: { events: MbatikEvent[]
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/images/mbatik-bareng/mbatik-jalanan-02.webp"
+            src={content.heroImage.src}
             alt="Kegiatan Mbatik Bareng Setitik"
             className="absolute inset-0 h-full w-full object-cover"
-            style={{ objectPosition: 'center' }}
+            style={{ objectPosition: `${content.heroImage.positionX}% ${content.heroImage.positionY}%`, transform: `scale(${content.heroImage.zoom})` }}
           />
           <div className="absolute inset-0 bg-gradient-to-r from-forest via-forest/78 to-forest/15" />
           <div className="absolute inset-5 rounded-[23px] border border-white/15 sm:inset-7" />
@@ -147,7 +109,7 @@ export default function MbatikBarengAnimated({ events }: { events: MbatikEvent[]
             <motion.div variants={itemVariants} className="flex items-center gap-3">
               <span className="h-px w-9 bg-brown" />
               <p className="font-sans text-[10px] uppercase tracking-[0.25em] text-silk/55">
-                Kegiatan Setitik
+                {content.heroEyebrow}
               </p>
             </motion.div>
 
@@ -155,16 +117,15 @@ export default function MbatikBarengAnimated({ events }: { events: MbatikEvent[]
               variants={itemVariants}
               className="mt-5 font-serif text-4xl leading-[0.98] text-silk md:text-5xl"
             >
-              Mbatik Bareng,
-              <span className="block italic text-brown">di jalanan Kota Lama.</span>
+              {content.heroTitle}
+              <span className="block italic text-brown">{content.heroAccent}</span>
             </motion.h1>
 
             <motion.p
               variants={itemVariants}
               className="mt-4 max-w-lg font-sans text-sm leading-[1.75] text-silk/67"
             >
-              Ruang belajar membatik bersama Setitik di tepi jalan Kota Lama
-              Semarang. Peserta tidak perlu memiliki pengalaman membatik sebelumnya.
+              {content.heroDescription}
             </motion.p>
 
             <motion.div variants={itemVariants} className="mt-4 flex flex-wrap gap-2">
@@ -199,11 +160,11 @@ export default function MbatikBarengAnimated({ events }: { events: MbatikEvent[]
           <div className="relative overflow-hidden bg-forest p-6 text-silk sm:p-7 lg:p-8">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/mbatik-bareng/mbatik-jalanan-05.webp"
+              src={content.registrationImage.src}
               alt=""
               aria-hidden
               className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-luminosity"
-              style={{ objectPosition: 'center' }}
+              style={{ objectPosition: `${content.registrationImage.positionX}% ${content.registrationImage.positionY}%`, transform: `scale(${content.registrationImage.zoom})` }}
             />
             <div className="absolute inset-0 bg-gradient-to-br from-forest via-forest/94 to-forest/74" />
 
@@ -384,20 +345,19 @@ export default function MbatikBarengAnimated({ events }: { events: MbatikEvent[]
           <motion.div variants={itemVariants} className="mb-6 grid gap-5 lg:grid-cols-[0.7fr_1fr] lg:items-end">
             <div>
               <p className="font-sans text-[10px] uppercase tracking-[0.22em] text-stone">
-                Dokumentasi
+                {content.galleryEyebrow}
               </p>
-              <h2 className="mt-3 font-serif text-4xl text-ink">Suasana Mbatik di Jalanan</h2>
+              <h2 className="mt-3 font-serif text-4xl text-ink">{content.galleryTitle}</h2>
             </div>
             <p className="max-w-xl border-l border-brown/30 pl-5 font-sans text-sm leading-[1.8] text-stone">
-              Dari teras bangunan tua, kain display, sampai peserta yang duduk
-              melingkar, Mbatik Bareng dibuat sebagai ruang belajar yang dekat dengan kota.
+              {content.galleryDescription}
             </p>
           </motion.div>
 
           <div className="space-y-5">
-            {gallery.map((image, index) => (
+            {content.galleryItems.map((item, index) => (
               <motion.figure
-                key={image.src}
+                key={item.id}
                 variants={itemVariants}
                 className={`group grid overflow-hidden rounded-[28px] border border-sand bg-cream shadow-[0_18px_55px_rgba(65,49,31,0.08)] lg:grid-cols-[1.12fr_0.88fr] ${
                   index % 2 === 1 ? 'lg:[&>div:first-child]:order-2' : ''
@@ -406,10 +366,10 @@ export default function MbatikBarengAnimated({ events }: { events: MbatikEvent[]
                 <div className="relative min-h-[260px] overflow-hidden bg-sand md:min-h-[340px]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={image.src}
-                    alt={image.alt}
+                    src={item.image.src}
+                    alt={item.title}
                     className="h-full w-full object-cover"
-                    style={{ objectPosition: image.position }}
+                    style={{ objectPosition: `${item.image.positionX}% ${item.image.positionY}%`, transform: `scale(${item.image.zoom})` }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-forest/35 via-transparent to-transparent" />
                 </div>
@@ -418,15 +378,14 @@ export default function MbatikBarengAnimated({ events }: { events: MbatikEvent[]
                   <div>
                     <p className="flex items-center gap-3 font-sans text-[9px] uppercase tracking-[0.22em] text-brown">
                       <span className="h-px w-9 bg-brown" />
-                      Dokumentasi {String(index + 1).padStart(2, '0')}
+                      {item.eyebrow}
                     </p>
                     <p className="mt-6 max-w-sm font-serif text-3xl leading-tight md:text-4xl">
-                      {image.caption}
+                      {item.title}
                     </p>
                   </div>
                   <p className="mt-9 border-t border-brown/25 pt-5 font-sans text-sm leading-[1.8] text-stone">
-                    Bagian dari suasana Mbatik di Jalanan, ruang belajar terbuka yang mempertemukan
-                    proses membatik, peserta, dan bangunan Kota Lama.
+                    {item.description}
                   </p>
                 </figcaption>
               </motion.figure>

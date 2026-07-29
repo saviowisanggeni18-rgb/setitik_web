@@ -4,6 +4,7 @@ import CollaborationEventsSection from '@/components/sections/CollaborationEvent
 import TargetedUpdatesSection from '@/components/sections/TargetedUpdatesSection'
 import { listHomepageSections } from '@/lib/homepage-sections'
 import CustomHomepageSection from '@/components/sections/CustomHomepageSection'
+import SectionTextOverrides from '@/components/sections/SectionTextOverrides'
 
 export const metadata: Metadata = {
   title: 'Tentang',
@@ -19,13 +20,13 @@ export default async function AboutPage() {
     <>
       {aboutSections.map((item, index) => {
         if (item.sectionKey === 'about-main') {
-          return <AboutAnimated key={item.id} section={item} />
+          return <SectionTextOverrides key={item.id} section={item}><AboutAnimated section={item} /></SectionTextOverrides>
         }
         if (item.sectionKey === 'collaboration-events') {
-          return <CollaborationEventsSection key={item.id} section={item} />
+          return <SectionTextOverrides key={item.id} section={item}><CollaborationEventsSection section={item} /></SectionTextOverrides>
         }
         if (item.kind === 'custom') {
-          return <CustomHomepageSection key={item.id} section={item} index={index} />
+          return <SectionTextOverrides key={item.id} section={item}><CustomHomepageSection section={item} index={index} /></SectionTextOverrides>
         }
         return null
       })}

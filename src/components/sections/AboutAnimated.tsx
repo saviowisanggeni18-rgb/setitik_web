@@ -46,6 +46,7 @@ const timeline = [
     label: 'Kolaborasi motif',
   },
 ]
+type TimelineItem = (typeof timeline)[number]
 
 const missions = [
   {
@@ -67,7 +68,7 @@ const missions = [
 ]
 
 type AboutImageState = { src: string; positionX: number; positionY: number; zoom: number }
-type AboutContent = { intro: string; images: Record<string, AboutImageState> }
+type AboutContent = { intro: string; images: Record<string, AboutImageState>; timeline: TimelineItem[] }
 const aboutContentMarker = '__SETITIK_ABOUT_CONTENT__:'
 const defaultIntro = 'Setitik dimulai pada 2019 dari keyakinan bahwa bangunan tua menyimpan cerita yang layak diabadikan—bukan hanya di museum, tetapi di atas kain yang dapat dipakai.'
 
@@ -76,18 +77,18 @@ function readAboutContent(section?: HomepageSection): AboutContent {
   if (description.startsWith(aboutContentMarker)) {
     try {
       const parsed = JSON.parse(description.slice(aboutContentMarker.length)) as Partial<AboutContent>
-      return { intro: parsed.intro || defaultIntro, images: parsed.images || {} }
+      return { intro: parsed.intro || defaultIntro, images: parsed.images || {}, timeline: parsed.timeline?.length ? parsed.timeline : timeline }
     } catch {}
   }
-  return { intro: description.trim() || defaultIntro, images: {} }
+  return { intro: description.trim() || defaultIntro, images: {}, timeline }
 }
 
 function EditableAboutImage({ image, alt, editing, onChange, onUpload }: { image: AboutImageState; alt: string; editing: boolean; onChange: (image: AboutImageState) => void; onUpload?: (file: File) => Promise<string> }) {
   const dragRef = useRef<{ x: number; y: number; positionX: number; positionY: number } | null>(null)
   return <div className={`absolute inset-0 overflow-hidden ${editing ? 'cursor-grab touch-none overscroll-contain active:cursor-grabbing' : ''}`} onWheel={(event) => { if (!editing) return; event.preventDefault(); event.stopPropagation(); const zoom = Math.min(3, Math.max(1, image.zoom + (event.deltaY < 0 ? 0.1 : -0.1))); onChange({ ...image, zoom: Number(zoom.toFixed(2)) }) }} onPointerDown={(event) => { if (!editing || (event.target as Element).closest('label,input')) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); dragRef.current = { x: event.clientX, y: event.clientY, positionX: image.positionX, positionY: image.positionY } }} onPointerMove={(event) => { const drag = dragRef.current; if (!drag || !editing) return; const bounds = event.currentTarget.getBoundingClientRect(); onChange({ ...image, positionX: Number(Math.min(100, Math.max(0, drag.positionX - ((event.clientX - drag.x) / bounds.width) * 100)).toFixed(1)), positionY: Number(Math.min(100, Math.max(0, drag.positionY - ((event.clientY - drag.y) / bounds.height) * 100)).toFixed(1)) }) }} onPointerUp={(event) => { dragRef.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId) }} onPointerCancel={() => { dragRef.current = null }}>
     {/* eslint-disable-next-line @next/next/no-img-element */}<img src={image.src} alt={alt} className="h-full w-full object-cover" style={{ objectPosition: `${image.positionX}% ${image.positionY}%`, transform: `scale(${image.zoom})`, transformOrigin: `${image.positionX}% ${image.positionY}%` }} />
-    {editing && onUpload && <label className="absolute right-4 top-4 z-30 cursor-pointer rounded-full border border-sand bg-silk px-4 py-2 font-sans text-[9px] font-semibold uppercase tracking-[0.12em] text-forest shadow-lg">Ganti gambar<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={async (event) => { const file = event.target.files?.[0]; if (file) onChange({ ...image, src: await onUpload(file) }); event.currentTarget.value = '' }} /></label>}
-    {editing && <span className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full bg-brown px-3 py-1.5 font-sans text-[9px] font-semibold text-white shadow-lg">Seret gambar · scroll untuk zoom</span>}
+    {editing && onUpload && <label data-section-editor-control="true" className="absolute right-4 top-4 z-30 cursor-pointer rounded-full border border-sand bg-silk px-4 py-2 font-sans text-[9px] font-semibold uppercase tracking-[0.12em] text-forest shadow-lg">Ganti gambar<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={async (event) => { const file = event.target.files?.[0]; if (file) onChange({ ...image, src: await onUpload(file) }); event.currentTarget.value = '' }} /></label>}
+    {editing && <span data-section-editor-control="true" className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full bg-brown px-3 py-1.5 font-sans text-[9px] font-semibold text-white shadow-lg">Seret gambar · scroll untuk zoom</span>}
   </div>
 }
 
@@ -95,8 +96,9 @@ export default function AboutAnimated({ section, editing = false, onTitleChange,
   const initial = readAboutContent(section)
   const [intro, setIntro] = useState(initial.intro)
   const [images, setImages] = useState(initial.images)
-  useEffect(() => { const next = readAboutContent(section); setIntro(next.intro); setImages(next.images) }, [section?.id, section?.description])
-  const commit = (nextIntro: string, nextImages: Record<string, AboutImageState>) => onContentChange?.(`${aboutContentMarker}${JSON.stringify({ intro: nextIntro, images: nextImages })}`)
+  const [timelineItems, setTimelineItems] = useState(initial.timeline)
+  useEffect(() => { const next = readAboutContent(section); setIntro(next.intro); setImages(next.images); setTimelineItems(next.timeline) }, [section?.id, section?.description])
+  const commit = (nextIntro: string, nextImages: Record<string, AboutImageState>, nextTimeline = timelineItems) => onContentChange?.(`${aboutContentMarker}${JSON.stringify({ intro: nextIntro, images: nextImages, timeline: nextTimeline })}`)
   const getImage = (key: string, src: string, x = 50, y = 50): AboutImageState => images[key] ?? { src, positionX: x, positionY: y, zoom: 1 }
   const updateImage = (key: string, value: AboutImageState) => { const next = { ...images, [key]: value }; setImages(next); commit(intro, next) }
   return (
@@ -191,7 +193,7 @@ export default function AboutAnimated({ section, editing = false, onTitleChange,
                     Visi
                   </p>
                   <h2 className="mt-4 font-serif text-4xl leading-[1.06] text-silk md:text-5xl">
-                    Arah yang
+                    <span className="block">Arah yang</span>
                     <span className="block italic text-brown">dijaga.</span>
                   </h2>
                 </div>
@@ -215,7 +217,7 @@ export default function AboutAnimated({ section, editing = false, onTitleChange,
 
               <div className="flex flex-col justify-between gap-7 py-2">
                 <p className="max-w-3xl font-serif text-4xl leading-[1.2] text-ink md:text-5xl">
-                  Menyejahterakan warga sekitar area cagar budaya dengan memproduksi
+                  <span>Menyejahterakan warga sekitar area cagar budaya dengan memproduksi</span>
                   <span className="italic text-brown"> wastra bermotif cagar budaya.</span>
                 </p>
 
@@ -308,7 +310,7 @@ export default function AboutAnimated({ section, editing = false, onTitleChange,
               </p>
               <div className="mt-4 grid gap-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-end">
                 <h2 className="max-w-2xl font-serif text-4xl leading-[1.08] text-silk md:text-5xl">
-                  Dari ornamen arsitektur
+                  <span className="block">Dari ornamen arsitektur</span>
                   <span className="block italic text-brown">ke helai kain.</span>
                 </h2>
                 <p className="max-w-xl font-sans text-sm leading-[1.85] text-silk/58 lg:justify-self-end lg:text-right">
@@ -402,7 +404,7 @@ export default function AboutAnimated({ section, editing = false, onTitleChange,
           </div>
 
           <div className="relative mt-6 space-y-5 md:mt-8">
-            {timeline.map(({ year, title, body, image, label }, index) => {
+            {timelineItems.map(({ year, title, body, image, label }, index) => {
               const reversed = index % 2 === 1
 
               return (
@@ -452,9 +454,48 @@ export default function AboutAnimated({ section, editing = false, onTitleChange,
                       </div>
                     </div>
                   </div>
+                  {editing && index >= timeline.length && index === timelineItems.length - 1 && (
+                    <button
+                      type="button"
+                      data-section-editor-control="true"
+                      onClick={() => {
+                        const nextTimeline = timelineItems.slice(0, -1)
+                        const imageKey = `timeline-${index}`
+                        const nextImages = { ...images }
+                        delete nextImages[imageKey]
+                        setTimelineItems(nextTimeline)
+                        setImages(nextImages)
+                        commit(intro, nextImages, nextTimeline)
+                      }}
+                      className="absolute bottom-4 right-4 z-40 rounded-full border border-red-300 bg-white/95 px-4 py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-red-600 shadow-lg transition hover:bg-red-600 hover:text-white"
+                    >
+                      Batalkan perjalanan
+                    </button>
+                  )}
                 </motion.article>
               )
             })}
+            {editing && (
+              <button
+                type="button"
+                data-section-editor-control="true"
+                onClick={() => {
+                  const lastYear = Number(timelineItems.at(-1)?.year) || new Date().getFullYear()
+                  const nextTimeline = [...timelineItems, {
+                    year: String(lastYear + 1),
+                    title: 'Perjalanan baru',
+                    body: 'Klik teks ini untuk menceritakan perjalanan Setitik berikutnya.',
+                    image: '/images/editorial/founder-canting.webp',
+                    label: 'Cerita baru',
+                  }]
+                  setTimelineItems(nextTimeline)
+                  commit(intro, images, nextTimeline)
+                }}
+                className="flex h-14 w-full items-center justify-center rounded-[24px] border border-dashed border-brown bg-silk font-sans text-xs font-semibold uppercase tracking-[0.16em] text-forest transition hover:bg-brown hover:text-silk"
+              >
+                + Tambah perjalanan
+              </button>
+            )}
           </div>
 
           <div className="hidden">
@@ -476,7 +517,7 @@ export default function AboutAnimated({ section, editing = false, onTitleChange,
                   Perjalanan
                 </p>
                 <h2 className="mt-4 max-w-2xl font-serif text-4xl leading-[1.08] text-silk md:text-5xl">
-                  Dari ornamen arsitektur
+                  <span className="block">Dari ornamen arsitektur</span>
                   <span className="block italic text-brown">ke helai kain.</span>
                 </h2>
               </div>

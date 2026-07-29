@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import ImpactAnimated from '@/components/sections/ImpactAnimated'
 import { listHomepageSections } from '@/lib/homepage-sections'
 import CustomHomepageSection from '@/components/sections/CustomHomepageSection'
+import SectionTextOverrides from '@/components/sections/SectionTextOverrides'
 
 export const metadata: Metadata = {
   title: 'Dampak',
@@ -13,9 +14,9 @@ export default async function ImpactPage() {
   const impactSections = sections.filter((item) => item.page === 'impact')
   return (
     <>
-      <ImpactAnimated section={impactSections.find((item) => item.sectionKey === 'impact-main')} />
+      {impactSections.find((item) => item.sectionKey === 'impact-main') && (() => { const section = impactSections.find((item) => item.sectionKey === 'impact-main')!; return <SectionTextOverrides section={section}><ImpactAnimated section={section} /></SectionTextOverrides> })()}
       {impactSections.filter((item) => item.kind === 'custom').map((item, index) => (
-        <CustomHomepageSection key={item.id} section={item} index={index} />
+        <SectionTextOverrides key={item.id} section={item}><CustomHomepageSection section={item} index={index} /></SectionTextOverrides>
       ))}
     </>
   )

@@ -6,6 +6,7 @@ import HomepageSectionManager from '@/components/admin/HomepageSectionManager'
 import ReportsPanel from '@/components/admin/ReportsPanel'
 import UpdateManager from '@/components/admin/UpdateManager'
 import CatalogProductManager from '@/components/admin/CatalogProductManager'
+import MbatikPageEditor from '@/components/admin/MbatikPageEditor'
 
 type Tab = 'homepage' | 'catalog' | 'about' | 'impact' | 'mbatik' | 'reports'
 
@@ -198,7 +199,10 @@ export default function AdminDashboard() {
         ) : activeTab === 'impact' ? (
           <HomepageSectionManager password={password} page="impact" />
         ) : activeTab === 'mbatik' ? (
-          <UpdateManager password={password} initialTarget="mbatik" lockedTarget />
+          <>
+            <MbatikPageEditor password={password} />
+            <UpdateManager password={password} initialTarget="mbatik" lockedTarget />
+          </>
         ) : activeTab === 'reports' ? (
           <ReportsPanel password={password} />
         ) : null}

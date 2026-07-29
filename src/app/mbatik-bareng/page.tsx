@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import MbatikBarengAnimated from '@/components/sections/MbatikBarengAnimated'
 import { listMbatikEvents } from '@/lib/mbatik-events'
+import { loadMbatikPageContent } from '@/lib/mbatik-page-content'
 
 export const metadata: Metadata = {
   title: 'Mbatik Bareng',
@@ -8,11 +9,13 @@ export const metadata: Metadata = {
 }
 
 export default async function MbatikBarengPage() {
-  const events = await listMbatikEvents()
+  const [events, content] = await Promise.all([listMbatikEvents(), loadMbatikPageContent()])
 
   return (
     <>
-      <MbatikBarengAnimated events={events} />
+      <MbatikBarengAnimated events={events} content={content} />
     </>
   )
 }
+
+export const dynamic = 'force-dynamic'

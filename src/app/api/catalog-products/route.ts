@@ -42,17 +42,20 @@ function validateOptionalImage(file: FormDataEntryValue | null, label: string) {
   return null
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const adminPassword = request.headers.get('x-admin-password')
+  const isAdmin = isAdminPasswordConfigured() && isAdminPasswordValid(adminPassword)
+
   try {
     const products = await listCatalogProducts({
-      visibleOnly: false,
+      visibleOnly: !isAdmin,
       fallbackToDefault: true,
     })
 
-    return NextResponse.json({
-      configured: isCatalogModuleConfigured(),
-      products,
-    })
+    return NextResponse.json(
+      { configured: isCatalogModuleConfigured(), products },
+      { headers: { 'Cache-Control': 'private, no-store', Vary: 'x-admin-password' } }
+    )
   } catch (error) {
     return NextResponse.json(
       {
@@ -60,7 +63,7 @@ export async function GET() {
         message: error instanceof Error ? error.message : 'Gagal mengambil katalog.',
         products: [],
       },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'private, no-store', Vary: 'x-admin-password' } }
     )
   }
 }

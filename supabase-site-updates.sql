@@ -81,6 +81,9 @@ create table if not exists public.homepage_sections (
   description text not null,
   image_url text,
   image_path text,
+  image_position_x integer not null default 50,
+  image_position_y integer not null default 50,
+  image_zoom numeric(4,2) not null default 1,
   is_visible boolean not null default true,
   sort_order integer not null default 100,
   created_at timestamptz not null default now(),
@@ -96,6 +99,9 @@ alter table public.homepage_sections
   add column if not exists description text,
   add column if not exists image_url text,
   add column if not exists image_path text,
+  add column if not exists image_position_x integer,
+  add column if not exists image_position_y integer,
+  add column if not exists image_zoom numeric(4,2),
   add column if not exists is_visible boolean,
   add column if not exists sort_order integer,
   add column if not exists created_at timestamptz,
@@ -130,6 +136,9 @@ set
   label = coalesce(label, 'Bagian Website'),
   title = coalesce(title, 'Judul bagian'),
   description = coalesce(description, 'Deskripsi bagian belum diisi.'),
+  image_position_x = greatest(0, least(100, coalesce(image_position_x, 50))),
+  image_position_y = greatest(0, least(100, coalesce(image_position_y, 50))),
+  image_zoom = greatest(1, least(3, coalesce(image_zoom, 1))),
   is_visible = coalesce(is_visible, true),
   sort_order = coalesce(sort_order, 100),
   created_at = coalesce(created_at, now()),
@@ -141,6 +150,12 @@ alter table public.homepage_sections
   alter column label set not null,
   alter column title set not null,
   alter column description set not null,
+  alter column image_position_x set default 50,
+  alter column image_position_x set not null,
+  alter column image_position_y set default 50,
+  alter column image_position_y set not null,
+  alter column image_zoom set default 1,
+  alter column image_zoom set not null,
   alter column is_visible set default true,
   alter column is_visible set not null,
   alter column sort_order set default 100,
@@ -161,6 +176,37 @@ begin
     alter table public.homepage_sections
       add constraint homepage_sections_kind_check
       check (kind in ('built-in', 'custom'));
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.homepage_sections'::regclass
+      and conname = 'homepage_sections_image_position_x_check'
+  ) then
+    alter table public.homepage_sections
+      add constraint homepage_sections_image_position_x_check
+      check (image_position_x between 0 and 100);
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.homepage_sections'::regclass
+      and conname = 'homepage_sections_image_position_y_check'
+  ) then
+    alter table public.homepage_sections
+      add constraint homepage_sections_image_position_y_check
+      check (image_position_y between 0 and 100);
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.homepage_sections'::regclass
+      and conname = 'homepage_sections_image_zoom_check'
+  ) then
+    alter table public.homepage_sections
+      add constraint homepage_sections_image_zoom_check
+      check (image_zoom between 0.75 and 3);
   end if;
 end $$;
 

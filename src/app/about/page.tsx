@@ -22,7 +22,7 @@ export default async function AboutPage() {
           return <AboutAnimated key={item.id} section={item} />
         }
         if (item.sectionKey === 'collaboration-events') {
-          return <CollaborationEventsSection key={item.id} />
+          return <CollaborationEventsSection key={item.id} section={item} />
         }
         if (item.kind === 'custom') {
           return <CustomHomepageSection key={item.id} section={item} index={index} />

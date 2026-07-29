@@ -40,6 +40,9 @@ export type HomepageSection = {
   description: string
   imageUrl: string | null
   imagePath: string | null
+  imagePositionX?: number
+  imagePositionY?: number
+  imageZoom?: number
   isVisible: boolean
   sortOrder: number
   createdAt: string
@@ -56,6 +59,9 @@ type HomepageSectionRow = {
   description: string
   image_url: string | null
   image_path: string | null
+  image_position_x?: number | null
+  image_position_y?: number | null
+  image_zoom?: number | null
   is_visible: boolean
   sort_order: number
   created_at: string
@@ -63,6 +69,8 @@ type HomepageSectionRow = {
 }
 
 const homepageSectionColumns =
+  'id,section_key,kind,label,title,description,image_url,image_path,image_position_x,image_position_y,image_zoom,is_visible,sort_order,created_at,page_key'
+const transformlessHomepageSectionColumns =
   'id,section_key,kind,label,title,description,image_url,image_path,is_visible,sort_order,created_at,page_key'
 const legacyHomepageSectionColumns =
   'id,section_key,kind,label,title,description,image_url,image_path,is_visible,sort_order,created_at'
@@ -70,6 +78,12 @@ const legacyHomepageSectionColumns =
 function isMissingPageKeyError(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() ?? ''
   return message.includes('page_key') && message.includes('homepage_sections')
+}
+
+function isMissingImageTransformError(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? ''
+  return message.includes('homepage_sections') &&
+    (message.includes('image_position_x') || message.includes('image_position_y') || message.includes('image_zoom'))
 }
 
 function legacyPageFromSectionKey(sectionKey: string | null) {
@@ -95,6 +109,25 @@ function templateFromSectionKey(sectionKey: string | null): HomepageSectionTempl
     || template === 'minimal'
     ? template
     : 'editorial'
+}
+
+function transformFromSectionKey(sectionKey: string | null) {
+  const match = sectionKey?.match(/:crop:([\d.]+):([\d.]+):([\d.]+)$/)
+  return {
+    x: match ? Number(match[1]) : 50,
+    y: match ? Number(match[2]) : 50,
+    zoom: match ? Math.max(1, Number(match[3])) : 1,
+  }
+}
+
+function sectionKeyWithTransform(
+  sectionKey: string,
+  imagePositionX: number,
+  imagePositionY: number,
+  imageZoom: number
+) {
+  const baseKey = sectionKey.replace(/:crop:[\d.]+:[\d.]+:[\d.]+$/, '')
+  return `${baseKey}:crop:${imagePositionX.toFixed(2)}:${imagePositionY.toFixed(2)}:${imageZoom.toFixed(2)}`
 }
 
 export const defaultHomepageSections: HomepageSection[] = [
@@ -223,6 +256,7 @@ export const defaultHomepageSections: HomepageSection[] = [
 ]
 
 function toHomepageSection(row: HomepageSectionRow): HomepageSection {
+  const storedTransform = transformFromSectionKey(row.section_key)
   return {
     id: row.id,
     sectionKey: row.section_key,
@@ -232,6 +266,9 @@ function toHomepageSection(row: HomepageSectionRow): HomepageSection {
     description: row.description,
     imageUrl: row.image_url,
     imagePath: row.image_path,
+    imagePositionX: row.image_position_x ?? storedTransform.x,
+    imagePositionY: row.image_position_y ?? storedTransform.y,
+    imageZoom: Math.max(1, row.image_zoom ?? storedTransform.zoom),
     isVisible: row.is_visible,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
@@ -329,7 +366,27 @@ export async function listHomepageSections({
       query = query.eq('is_visible', true)
     }
 
-    let { data, error } = await query
+    const primaryResult = await query
+    const data = primaryResult.data
+    let error = primaryResult.error
+
+    if (isMissingImageTransformError(error)) {
+      let transformlessQuery = supabase
+        .from('homepage_sections')
+        .select(transformlessHomepageSectionColumns)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
+
+      if (visibleOnly) transformlessQuery = transformlessQuery.eq('is_visible', true)
+
+      const transformlessResult = await transformlessQuery
+      if (!transformlessResult.error) {
+        return (transformlessResult.data ?? []).map((row) =>
+          toHomepageSection(row as HomepageSectionRow)
+        )
+      }
+      error = transformlessResult.error
+    }
 
     if (isMissingPageKeyError(error)) {
       let legacyQuery = supabase
@@ -365,15 +422,23 @@ export async function listHomepageSections({
 export async function createCustomHomepageSection({
   title,
   description,
+  label,
   image,
   page = 'home',
   template = 'editorial',
+  imagePositionX = 50,
+  imagePositionY = 50,
+  imageZoom = 1,
 }: {
   title: string
   description: string
+  label: string
   image: File | null
   page?: 'home' | 'about' | 'impact'
   template?: HomepageSectionTemplate
+  imagePositionX?: number
+  imagePositionY?: number
+  imageZoom?: number
 }) {
   const supabase = getSupabaseAdmin()
 
@@ -397,12 +462,15 @@ export async function createCustomHomepageSection({
   const insertPayload = {
     section_key: `custom:${page}:${template}:${crypto.randomUUID()}`,
     kind: 'custom',
-    label: title,
+    label,
     title,
     description,
     page_key: page,
     image_url: imageUrl,
     image_path: imagePath,
+    image_position_x: imagePositionX,
+    image_position_y: imagePositionY,
+    image_zoom: imageZoom,
     is_visible: true,
     sort_order: ((count ?? defaultHomepageSections.length) + 1) * 10,
   }
@@ -413,13 +481,58 @@ export async function createCustomHomepageSection({
     .select(homepageSectionColumns)
     .single()
 
+  if (isMissingImageTransformError(result.error)) {
+    const {
+      image_position_x: _imagePositionX,
+      image_position_y: _imagePositionY,
+      image_zoom: _imageZoom,
+      ...transformlessPayload
+    } = insertPayload
+    void _imagePositionX
+    void _imagePositionY
+    void _imageZoom
+    const transformlessResult = await supabase
+      .from('homepage_sections')
+      .insert({
+        ...transformlessPayload,
+        section_key: sectionKeyWithTransform(
+          transformlessPayload.section_key,
+          imagePositionX,
+          imagePositionY,
+          imageZoom
+        ),
+      })
+      .select(transformlessHomepageSectionColumns)
+      .single()
+
+    if (!transformlessResult.error) {
+      return toHomepageSection(transformlessResult.data as HomepageSectionRow)
+    }
+    result.error = transformlessResult.error
+  }
+
   if (isMissingPageKeyError(result.error)) {
-    const { page_key: _pageKey, ...legacyPayload } = insertPayload
+    const {
+      page_key: _pageKey,
+      image_position_x: _imagePositionX,
+      image_position_y: _imagePositionY,
+      image_zoom: _imageZoom,
+      ...legacyPayload
+    } = insertPayload
+    void _pageKey
+    void _imagePositionX
+    void _imagePositionY
+    void _imageZoom
     const legacyResult = await supabase
       .from('homepage_sections')
       .insert({
         ...legacyPayload,
-        section_key: insertPayload.section_key,
+        section_key: sectionKeyWithTransform(
+          insertPayload.section_key,
+          imagePositionX,
+          imagePositionY,
+          imageZoom
+        ),
       })
       .select(legacyHomepageSectionColumns)
       .single()
@@ -449,14 +562,22 @@ export async function updateHomepageSection({
   sortOrder,
   title,
   description,
+  label,
   image,
+  imagePositionX,
+  imagePositionY,
+  imageZoom,
 }: {
   id: string
   isVisible?: boolean
   sortOrder?: number
   title?: string
   description?: string
+  label?: string
   image?: File | null
+  imagePositionX?: number
+  imagePositionY?: number
+  imageZoom?: number
 }) {
   const supabase = getSupabaseAdmin()
 
@@ -472,9 +593,12 @@ export async function updateHomepageSection({
   if (typeof sortOrder === 'number') updatePayload.sort_order = sortOrder
   if (typeof title === 'string') {
     updatePayload.title = title
-    updatePayload.label = title
   }
   if (typeof description === 'string') updatePayload.description = description
+  if (typeof label === 'string' && label.trim()) updatePayload.label = label.trim()
+  if (typeof imagePositionX === 'number') updatePayload.image_position_x = imagePositionX
+  if (typeof imagePositionY === 'number') updatePayload.image_position_y = imagePositionY
+  if (typeof imageZoom === 'number') updatePayload.image_zoom = imageZoom
 
   if (image) {
     const { data: current } = await supabase
@@ -498,10 +622,83 @@ export async function updateHomepageSection({
     .select(homepageSectionColumns)
     .single()
 
+  if (isMissingImageTransformError(result.error)) {
+    const {
+      image_position_x: _imagePositionX,
+      image_position_y: _imagePositionY,
+      image_zoom: _imageZoom,
+      ...transformlessUpdatePayload
+    } = updatePayload
+    void _imagePositionX
+    void _imagePositionY
+    void _imageZoom
+
+    const { data: currentSection, error: currentSectionError } = await supabase
+      .from('homepage_sections')
+      .select('section_key,kind')
+      .eq('id', id)
+      .single()
+    if (currentSectionError) throw new Error(currentSectionError.message)
+
+    if (
+      currentSection?.kind === 'custom' &&
+      currentSection.section_key &&
+      typeof imagePositionX === 'number' &&
+      typeof imagePositionY === 'number' &&
+      typeof imageZoom === 'number'
+    ) {
+      transformlessUpdatePayload.section_key = sectionKeyWithTransform(
+        String(currentSection.section_key),
+        imagePositionX,
+        imagePositionY,
+        imageZoom
+      )
+    }
+    const transformlessResult = await supabase
+      .from('homepage_sections')
+      .update(transformlessUpdatePayload)
+      .eq('id', id)
+      .select(transformlessHomepageSectionColumns)
+      .single()
+    if (!transformlessResult.error) {
+      return toHomepageSection(transformlessResult.data as HomepageSectionRow)
+    }
+    result.error = transformlessResult.error
+  }
+
   if (isMissingPageKeyError(result.error)) {
+    const {
+      image_position_x: _imagePositionX,
+      image_position_y: _imagePositionY,
+      image_zoom: _imageZoom,
+      ...legacyUpdatePayload
+    } = updatePayload
+    void _imagePositionX
+    void _imagePositionY
+    void _imageZoom
+
+    const { data: currentSection } = await supabase
+      .from('homepage_sections')
+      .select('section_key,kind')
+      .eq('id', id)
+      .single()
+    if (
+      currentSection?.kind === 'custom' &&
+      currentSection.section_key &&
+      typeof imagePositionX === 'number' &&
+      typeof imagePositionY === 'number' &&
+      typeof imageZoom === 'number'
+    ) {
+      legacyUpdatePayload.section_key = sectionKeyWithTransform(
+        String(currentSection.section_key),
+        imagePositionX,
+        imagePositionY,
+        imageZoom
+      )
+    }
     const legacyResult = await supabase
       .from('homepage_sections')
-      .update(updatePayload)
+      .update(legacyUpdatePayload)
       .eq('id', id)
       .select(legacyHomepageSectionColumns)
       .single()

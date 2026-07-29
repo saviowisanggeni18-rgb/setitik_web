@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
 import type { HomepageSection } from '@/lib/homepage-sections'
 
 const ease = [0.16, 1, 0.3, 1] as const
@@ -65,7 +66,39 @@ const missions = [
   },
 ]
 
-export default function AboutAnimated({ section }: { section?: HomepageSection }) {
+type AboutImageState = { src: string; positionX: number; positionY: number; zoom: number }
+type AboutContent = { intro: string; images: Record<string, AboutImageState> }
+const aboutContentMarker = '__SETITIK_ABOUT_CONTENT__:'
+const defaultIntro = 'Setitik dimulai pada 2019 dari keyakinan bahwa bangunan tua menyimpan cerita yang layak diabadikan—bukan hanya di museum, tetapi di atas kain yang dapat dipakai.'
+
+function readAboutContent(section?: HomepageSection): AboutContent {
+  const description = section?.description ?? ''
+  if (description.startsWith(aboutContentMarker)) {
+    try {
+      const parsed = JSON.parse(description.slice(aboutContentMarker.length)) as Partial<AboutContent>
+      return { intro: parsed.intro || defaultIntro, images: parsed.images || {} }
+    } catch {}
+  }
+  return { intro: description.trim() || defaultIntro, images: {} }
+}
+
+function EditableAboutImage({ image, alt, editing, onChange, onUpload }: { image: AboutImageState; alt: string; editing: boolean; onChange: (image: AboutImageState) => void; onUpload?: (file: File) => Promise<string> }) {
+  const dragRef = useRef<{ x: number; y: number; positionX: number; positionY: number } | null>(null)
+  return <div className={`absolute inset-0 overflow-hidden ${editing ? 'cursor-grab touch-none overscroll-contain active:cursor-grabbing' : ''}`} onWheel={(event) => { if (!editing) return; event.preventDefault(); event.stopPropagation(); const zoom = Math.min(3, Math.max(1, image.zoom + (event.deltaY < 0 ? 0.1 : -0.1))); onChange({ ...image, zoom: Number(zoom.toFixed(2)) }) }} onPointerDown={(event) => { if (!editing || (event.target as Element).closest('label,input')) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); dragRef.current = { x: event.clientX, y: event.clientY, positionX: image.positionX, positionY: image.positionY } }} onPointerMove={(event) => { const drag = dragRef.current; if (!drag || !editing) return; const bounds = event.currentTarget.getBoundingClientRect(); onChange({ ...image, positionX: Number(Math.min(100, Math.max(0, drag.positionX - ((event.clientX - drag.x) / bounds.width) * 100)).toFixed(1)), positionY: Number(Math.min(100, Math.max(0, drag.positionY - ((event.clientY - drag.y) / bounds.height) * 100)).toFixed(1)) }) }} onPointerUp={(event) => { dragRef.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId) }} onPointerCancel={() => { dragRef.current = null }}>
+    {/* eslint-disable-next-line @next/next/no-img-element */}<img src={image.src} alt={alt} className="h-full w-full object-cover" style={{ objectPosition: `${image.positionX}% ${image.positionY}%`, transform: `scale(${image.zoom})`, transformOrigin: `${image.positionX}% ${image.positionY}%` }} />
+    {editing && onUpload && <label className="absolute right-4 top-4 z-30 cursor-pointer rounded-full border border-sand bg-silk px-4 py-2 font-sans text-[9px] font-semibold uppercase tracking-[0.12em] text-forest shadow-lg">Ganti gambar<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={async (event) => { const file = event.target.files?.[0]; if (file) onChange({ ...image, src: await onUpload(file) }); event.currentTarget.value = '' }} /></label>}
+    {editing && <span className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full bg-brown px-3 py-1.5 font-sans text-[9px] font-semibold text-white shadow-lg">Seret gambar · scroll untuk zoom</span>}
+  </div>
+}
+
+export default function AboutAnimated({ section, editing = false, onTitleChange, onContentChange, onImageUpload }: { section?: HomepageSection; editing?: boolean; onTitleChange?: (value: string) => void; onContentChange?: (value: string) => void; onImageUpload?: (file: File) => Promise<string> }) {
+  const initial = readAboutContent(section)
+  const [intro, setIntro] = useState(initial.intro)
+  const [images, setImages] = useState(initial.images)
+  useEffect(() => { const next = readAboutContent(section); setIntro(next.intro); setImages(next.images) }, [section?.id, section?.description])
+  const commit = (nextIntro: string, nextImages: Record<string, AboutImageState>) => onContentChange?.(`${aboutContentMarker}${JSON.stringify({ intro: nextIntro, images: nextImages })}`)
+  const getImage = (key: string, src: string, x = 50, y = 50): AboutImageState => images[key] ?? { src, positionX: x, positionY: y, zoom: 1 }
+  const updateImage = (key: string, value: AboutImageState) => { const next = { ...images, [key]: value }; setImages(next); commit(intro, next) }
   return (
     <div className="overflow-hidden px-6 py-8 md:py-10">
       <div className="mx-auto max-w-7xl">
@@ -85,17 +118,22 @@ export default function AboutAnimated({ section }: { section?: HomepageSection }
 
             <motion.h1
               variants={itemVariants}
-              className="mt-9 font-serif text-4xl leading-[1.05] text-silk md:text-5xl"
+              contentEditable={editing}
+              suppressContentEditableWarning
+              onBlur={(event) => onTitleChange?.(event.currentTarget.innerText.trim())}
+              className={`mt-9 font-serif text-4xl leading-[1.05] text-silk md:text-5xl ${editing ? 'cursor-text outline outline-2 outline-offset-4 outline-brown/70' : ''}`}
             >
               {section?.title ?? <><span>Jessie Setiawati</span><span className="mt-2 block italic text-brown">dan cerita Setitik.</span></>}
             </motion.h1>
 
             <motion.p
               variants={itemVariants}
-              className="mt-7 max-w-md font-sans text-sm leading-[1.85] text-silk/63"
+              contentEditable={editing}
+              suppressContentEditableWarning
+              onBlur={(event) => { const value = event.currentTarget.innerText.trim(); setIntro(value); commit(value, images) }}
+              className={`mt-7 max-w-md font-sans text-sm leading-[1.85] text-silk/63 ${editing ? 'cursor-text outline outline-2 outline-offset-4 outline-brown/70' : ''}`}
             >
-              {section?.description ??
-                'Setitik dimulai pada 2019 dari keyakinan bahwa bangunan tua menyimpan cerita yang layak diabadikan—bukan hanya di museum, tetapi di atas kain yang dapat dipakai.'}
+              {intro}
             </motion.p>
 
             <motion.p
@@ -118,14 +156,8 @@ export default function AboutAnimated({ section }: { section?: HomepageSection }
           </div>
 
           <motion.figure variants={itemVariants} className="relative min-h-[520px] overflow-hidden lg:min-h-full">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={section?.imageUrl ?? '/images/founder/jessie-setiawati-v3.webp'}
-              alt="Jessie Setiawati bersama karya batik Setitik"
-              className="h-full w-full object-cover"
-              style={{ objectPosition: '45% center' }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-forest/60 via-transparent to-transparent" />
+            <EditableAboutImage image={getImage('hero', section?.imageUrl ?? '/images/founder/jessie-setiawati-v3.webp', 45, 50)} alt="Jessie Setiawati bersama karya batik Setitik" editing={editing} onChange={(value) => updateImage('hero', value)} onUpload={onImageUpload} />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-forest/60 via-transparent to-transparent" />
             <figcaption className="absolute bottom-6 left-6 rounded-full border border-white/25 bg-forest/30 px-4 py-2 font-sans text-[8px] uppercase tracking-[0.18em] text-white/75 backdrop-blur-md">
               Semarang · 2019—sekarang
             </figcaption>
@@ -169,12 +201,11 @@ export default function AboutAnimated({ section }: { section?: HomepageSection }
                     { label: 'Bangunan', image: '/images/locations/semarang-gereja-blenduk.jpg' },
                     { label: 'Motif', image: '/images/products/batik-cap-kain-biru.png' },
                     { label: 'Kain', image: '/images/products/jarik-cap.png' },
-                  ].map(({ label, image }) => (
+                  ].map(({ label, image }, index) => (
                     <div key={label} className="relative h-28 border-r border-silk/12 last:border-r-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={image} alt={label} className="h-full w-full object-cover opacity-80" />
-                      <div className="absolute inset-0 bg-forest/25" />
-                      <p className="absolute bottom-3 left-3 font-sans text-[8px] uppercase tracking-[0.16em] text-silk">
+                      <EditableAboutImage image={getImage(`vision-${index}`, image)} alt={label} editing={editing} onChange={(value) => updateImage(`vision-${index}`, value)} onUpload={onImageUpload} />
+                      <div className="pointer-events-none absolute inset-0 bg-forest/25" />
+                      <p className="pointer-events-none absolute bottom-3 left-3 font-sans text-[8px] uppercase tracking-[0.16em] text-silk">
                         {label}
                       </p>
                     </div>
@@ -386,13 +417,8 @@ export default function AboutAnimated({ section }: { section?: HomepageSection }
                         reversed ? 'lg:order-2' : ''
                       }`}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={image}
-                        alt={`${title} - ${label}`}
-                        className="h-full w-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-forest/78 via-forest/12 to-transparent" />
+                      <EditableAboutImage image={getImage(`timeline-${index}`, image)} alt={`${title} - ${label}`} editing={editing} onChange={(value) => updateImage(`timeline-${index}`, value)} onUpload={onImageUpload} />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-forest/78 via-forest/12 to-transparent" />
                       <div className="absolute left-5 top-5 flex flex-wrap gap-2">
                         <span className="rounded-full bg-silk/92 px-4 py-2 font-sans text-[8px] uppercase tracking-[0.16em] text-forest">
                           {label}

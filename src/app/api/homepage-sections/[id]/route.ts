@@ -29,7 +29,11 @@ export async function PATCH(
   const sortOrderRaw = formData.get('sortOrder')
   const titleRaw = formData.get('title')
   const descriptionRaw = formData.get('description')
+  const labelRaw = formData.get('label')
   const imageRaw = formData.get('image')
+  const imagePositionXRaw = formData.get('imagePositionX')
+  const imagePositionYRaw = formData.get('imagePositionY')
+  const imageZoomRaw = formData.get('imageZoom')
   const { id } = await params
 
   try {
@@ -46,7 +50,20 @@ export async function PATCH(
       title: typeof titleRaw === 'string' ? titleRaw.trim() : undefined,
       description:
         typeof descriptionRaw === 'string' ? descriptionRaw.trim() : undefined,
+      label: typeof labelRaw === 'string' ? labelRaw.trim() : undefined,
       image: imageRaw instanceof File && imageRaw.size > 0 ? imageRaw : null,
+      imagePositionX:
+        typeof imagePositionXRaw === 'string'
+          ? Math.min(100, Math.max(0, Number(imagePositionXRaw)))
+          : undefined,
+      imagePositionY:
+        typeof imagePositionYRaw === 'string'
+          ? Math.min(100, Math.max(0, Number(imagePositionYRaw)))
+          : undefined,
+      imageZoom:
+        typeof imageZoomRaw === 'string'
+          ? Math.min(3, Math.max(1, Number(imageZoomRaw)))
+          : undefined,
     })
 
     return NextResponse.json({ section })

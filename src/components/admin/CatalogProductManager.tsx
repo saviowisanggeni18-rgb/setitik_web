@@ -3,7 +3,6 @@
 import {
   FormEvent,
   PointerEvent as ReactPointerEvent,
-  WheelEvent as ReactWheelEvent,
   useEffect,
   useMemo,
   useRef,
@@ -288,7 +287,10 @@ export default function CatalogProductManager({ password }: Props) {
     setError('')
 
     try {
-      const response = await fetch('/api/catalog-products', { cache: 'no-store' })
+      const response = await fetch('/api/catalog-products', {
+        cache: 'no-store',
+        headers: { 'x-admin-password': password },
+      })
       const payload = await response.json()
 
       if (!response.ok) {
@@ -476,12 +478,37 @@ export default function CatalogProductManager({ password }: Props) {
   const buildingPreviewImage = buildingPreviewUrl ?? existingBuildingImageUrl
   const visibleCount = products.filter((product) => product.isVisible).length
 
-  function handlePreviewWheel(event: ReactWheelEvent<HTMLDivElement>) {
-    if (!previewImage) return
-    event.preventDefault()
-    const direction = event.deltaY < 0 ? 0.1 : -0.1
-    setImageZoom((current) => Number(clamp(current + direction, 0.75, 3).toFixed(2)))
-  }
+  useEffect(() => {
+    const frame = previewFrameRef.current
+    if (!frame || !previewImage) return
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const direction = event.deltaY < 0 ? 0.1 : -0.1
+      setImageZoom((current) => Number(clamp(current + direction, 0.75, 3).toFixed(2)))
+    }
+
+    frame.addEventListener('wheel', handleWheel, { passive: false })
+    return () => frame.removeEventListener('wheel', handleWheel)
+  }, [editorOpen, previewImage])
+
+  useEffect(() => {
+    const frame = buildingPreviewFrameRef.current
+    if (!frame || !buildingPreviewImage) return
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const direction = event.deltaY < 0 ? 0.1 : -0.1
+      setBuildingImageZoom((current) =>
+        Number(clamp(current + direction, 0.75, 3).toFixed(2))
+      )
+    }
+
+    frame.addEventListener('wheel', handleWheel, { passive: false })
+    return () => frame.removeEventListener('wheel', handleWheel)
+  }, [buildingPreviewImage, editorOpen, includeBuildingImage])
 
   function handlePreviewPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (!previewImage) return
@@ -513,15 +540,6 @@ export default function CatalogProductManager({ password }: Props) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
-  }
-
-  function handleBuildingPreviewWheel(event: ReactWheelEvent<HTMLDivElement>) {
-    if (!buildingPreviewImage) return
-    event.preventDefault()
-    const direction = event.deltaY < 0 ? 0.1 : -0.1
-    setBuildingImageZoom((current) =>
-      Number(clamp(current + direction, 0.75, 3).toFixed(2))
-    )
   }
 
   function handleBuildingPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -826,7 +844,6 @@ export default function CatalogProductManager({ password }: Props) {
                 <div
                   ref={buildingPreviewFrameRef}
                   className="relative aspect-[4/3] w-full touch-none overflow-hidden bg-sand cursor-grab active:cursor-grabbing"
-                  onWheel={handleBuildingPreviewWheel}
                   onPointerDown={handleBuildingPointerDown}
                   onPointerMove={handleBuildingPointerMove}
                   onPointerUp={stopBuildingDrag}
@@ -946,7 +963,6 @@ export default function CatalogProductManager({ password }: Props) {
               className={`relative aspect-[4/3] touch-none overflow-hidden bg-[#e7dac8] ${
                 previewImage ? 'cursor-grab active:cursor-grabbing' : ''
               }`}
-              onWheel={handlePreviewWheel}
               onPointerDown={handlePreviewPointerDown}
               onPointerMove={handlePreviewPointerMove}
               onPointerUp={stopPreviewDrag}

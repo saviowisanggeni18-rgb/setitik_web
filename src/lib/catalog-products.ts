@@ -58,6 +58,16 @@ export const catalogCategories: Product['category'][] = [
 const catalogSelect =
   'id,source,slug,name,category,subcategory,motif,building_full,building_story,building_built,price,price_note,dimensions,material,image_url,image_path,images,image_fit,image_position,image_positions,building_image,building_image_path,shopee_url,is_preorder,in_stock,is_visible,sort_order,created_at,updated_at'
 
+function normalizeLegacyBuildingImage(image: string | null) {
+  if (!image) return undefined
+  const replacements: Record<string, string> = {
+    '/images/buildings/gereja-blenduk.jpg': '/images/locations/semarang-gereja-blenduk.jpg',
+    '/images/buildings/monod-diephuis.jpg': '/images/locations/semarang-monod-diephuis.jpg',
+    '/images/buildings/nhm.jpg': '/images/locations/semarang-nhm.jpg',
+  }
+  return replacements[image] ?? image
+}
+
 function toCatalogProduct(row: CatalogProductRow): CatalogProduct {
   const images = Array.isArray(row.images) && row.images.length > 0 ? row.images : [row.image_url]
   const [storedPosition, storedZoom] = (row.image_position ?? '').split('|')
@@ -88,7 +98,7 @@ function toCatalogProduct(row: CatalogProductRow): CatalogProduct {
     imagePosition: storedPosition || undefined,
     imageZoom: Number.isFinite(imageZoom) ? imageZoom : undefined,
     imagePositions: cleanImagePositions.length > 0 ? cleanImagePositions : undefined,
-    buildingImage: row.building_image ?? undefined,
+    buildingImage: normalizeLegacyBuildingImage(row.building_image),
     buildingImagePosition: buildingImagePosition || undefined,
     buildingImageZoom: Number.isFinite(buildingImageZoom) ? buildingImageZoom : undefined,
     shopeeUrl: row.shopee_url ?? undefined,

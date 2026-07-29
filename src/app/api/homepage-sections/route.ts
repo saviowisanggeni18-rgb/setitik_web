@@ -11,20 +11,26 @@ const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp']
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
-  try {
-    const sections = await listHomepageSections({ fallbackToDefault: false })
+export async function GET(request: Request) {
+  const adminPassword = request.headers.get('x-admin-password')
+  const isAdmin = isAdminPasswordConfigured() && isAdminPasswordValid(adminPassword)
 
-    return NextResponse.json({
-      configured: isHomepageSectionModuleConfigured(),
-      sections,
+  try {
+    const sections = await listHomepageSections({
+      visibleOnly: !isAdmin,
+      fallbackToDefault: false,
     })
+
+    return NextResponse.json(
+      { configured: isHomepageSectionModuleConfigured(), sections },
+      { headers: { 'Cache-Control': 'private, no-store', Vary: 'x-admin-password' } }
+    )
   } catch (error) {
     return NextResponse.json(
       {
         message: error instanceof Error ? error.message : 'Gagal mengambil susunan beranda.',
       },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'private, no-store', Vary: 'x-admin-password' } }
     )
   }
 }
@@ -45,6 +51,7 @@ export async function POST(request: Request) {
 
   const title = String(formData.get('title') ?? '').trim()
   const description = String(formData.get('description') ?? '').trim()
+  const label = String(formData.get('label') ?? '').trim()
   const image = formData.get('image')
   const imageFile = image instanceof File && image.size > 0 ? image : null
   const pageRaw = String(formData.get('page') ?? 'home')
@@ -57,6 +64,9 @@ export async function POST(request: Request) {
   const template = allowedTemplates.includes(templateRaw as (typeof allowedTemplates)[number])
     ? (templateRaw as (typeof allowedTemplates)[number])
     : 'editorial'
+  const imagePositionX = Math.min(100, Math.max(0, Number(formData.get('imagePositionX') ?? 50)))
+  const imagePositionY = Math.min(100, Math.max(0, Number(formData.get('imagePositionY') ?? 50)))
+  const imageZoom = Math.min(3, Math.max(1, Number(formData.get('imageZoom') ?? 1)))
 
   if (!title || !description) {
     return NextResponse.json(
@@ -83,9 +93,13 @@ export async function POST(request: Request) {
     const section = await createCustomHomepageSection({
       title,
       description,
+      label: label || (page === 'about' ? 'Cerita Setitik' : page === 'impact' ? 'Catatan Dampak' : 'Kabar Setitik'),
       image: imageFile,
       page,
       template,
+      imagePositionX,
+      imagePositionY,
+      imageZoom,
     })
 
     return NextResponse.json({ section }, { status: 201 })

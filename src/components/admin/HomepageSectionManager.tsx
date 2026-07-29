@@ -1,6 +1,14 @@
 'use client'
 
-import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  FormEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -31,6 +39,14 @@ import CollaborationEventsSection from '@/components/sections/CollaborationEvent
 type Props = {
   password: string
   page?: 'home' | 'about' | 'impact'
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function defaultSectionEyebrow(page: 'home' | 'about' | 'impact') {
+  return page === 'about' ? 'Cerita Setitik' : page === 'impact' ? 'Catatan Dampak' : 'Kabar Setitik'
 }
 
 function TemplateThumbnail({ template }: { template: HomepageSectionTemplate }) {
@@ -70,21 +86,43 @@ function EditableSectionPreview({
   children,
   onTitleChange,
   onDescriptionChange,
+  onEyebrowChange,
   onImageChange,
+  imagePosition,
+  imageZoom,
+  onImagePositionChange,
+  onImageZoomChange,
 }: {
   section: HomepageSection
   editing: boolean
   children: ReactNode
   onTitleChange: (value: string) => void
   onDescriptionChange: (value: string) => void
+  onEyebrowChange: (value: string) => void
   onImageChange: (file: File) => void
+  imagePosition: { x: number; y: number }
+  imageZoom: number
+  onImagePositionChange: (value: { x: number; y: number }) => void
+  onImageZoomChange: (value: number) => void
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const dragRef = useRef<{
+    pointerX: number
+    pointerY: number
+    imageX: number
+    imageY: number
+    width: number
+    height: number
+  } | null>(null)
 
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
+
+    // Bagian arsip kolaborasi memiliki banyak kartu dan mengelola field editnya
+    // sendiri. Jangan tandai hanya heading/paragraf pertama sebagai field umum.
+    if (section.sectionKey === 'collaboration-events' || section.sectionKey === 'about-main') return
 
     const heading = root.querySelector<HTMLElement>('h1, h2')
     const paragraphs = [...root.querySelectorAll<HTMLElement>('p')]
@@ -94,10 +132,18 @@ function EditableSectionPreview({
         (a, b) => (b.textContent?.trim().length ?? 0) - (a.textContent?.trim().length ?? 0)
       )[0]
     const images = [...root.querySelectorAll<HTMLImageElement>('img')]
-    const editableImage =
-      images.find((item) => section.imageUrl && item.src === section.imageUrl) ?? images[0]
+    const eyebrow = root.querySelector<HTMLElement>('[data-homepage-eyebrow]')
+    const editableImages =
+      section.kind === 'custom'
+        ? images
+        : [images.find((item) => section.imageUrl && item.src.endsWith(section.imageUrl)) ?? images[0]].filter(
+            (item): item is HTMLImageElement => Boolean(item)
+          )
 
-    const markText = (element: HTMLElement | undefined | null, field: 'title' | 'description') => {
+    const markText = (
+      element: HTMLElement | undefined | null,
+      field: 'title' | 'description' | 'eyebrow'
+    ) => {
       if (!element) return
       element.contentEditable = editing ? 'true' : 'false'
       element.dataset.homepageField = field
@@ -110,19 +156,48 @@ function EditableSectionPreview({
 
     markText(heading, 'title')
     markText(description, 'description')
+    markText(eyebrow, 'eyebrow')
 
-    if (editableImage) {
+    editableImages.forEach((editableImage) => {
       editableImage.dataset.homepageImage = 'true'
+      editableImage.draggable = false
+      editableImage.classList.toggle('pointer-events-none', editing)
+      editableImage.classList.toggle('select-none', editing)
+      editableImage.classList.toggle('will-change-transform', editing)
       const imageContainer = editableImage.closest<HTMLElement>('figure') ?? editableImage.parentElement
       if (imageContainer) {
         imageContainer.dataset.homepageImageContainer = 'true'
         imageContainer.classList.toggle('cursor-pointer', editing)
+        imageContainer.classList.toggle('cursor-grab', editing)
+        imageContainer.classList.toggle('active:cursor-grabbing', editing)
+        imageContainer.classList.toggle('touch-none', editing)
+        imageContainer.classList.toggle('overscroll-contain', editing)
+        imageContainer.classList.toggle('select-none', editing)
         imageContainer.classList.toggle('ring-4', editing)
         imageContainer.classList.toggle('ring-brown', editing)
         imageContainer.classList.toggle('ring-inset', editing)
       }
+    })
+  }, [children, editing, section.imageUrl, section.kind, section.sectionKey])
+
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root || !editing) return
+
+    const handleImageWheel = (event: WheelEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (!target.closest('[data-homepage-image-container="true"]')) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      const direction = event.deltaY < 0 ? 0.1 : -0.1
+      onImageZoomChange(Number(clamp(imageZoom + direction, 1, 3).toFixed(2)))
     }
-  }, [children, editing, section.imageUrl])
+
+    root.addEventListener('wheel', handleImageWheel, { passive: false })
+    return () => root.removeEventListener('wheel', handleImageWheel)
+  }, [editing, imageZoom, onImageZoomChange])
 
   return (
     <div
@@ -134,18 +209,59 @@ function EditableSectionPreview({
         const value = target.innerText.trim()
         if (target.dataset.homepageField === 'title') onTitleChange(value)
         if (target.dataset.homepageField === 'description') onDescriptionChange(value)
+        if (target.dataset.homepageField === 'eyebrow') onEyebrowChange(value)
       }}
       onClickCapture={(event) => {
         if (!editing) return
         const target = event.target as HTMLElement
-        const imageArea = target.closest<HTMLElement>('[data-homepage-image="true"]')
-        if (imageArea) {
-          event.preventDefault()
-          event.stopPropagation()
-          inputRef.current?.click()
-          return
-        }
         if (target.closest('a, button, iframe')) event.preventDefault()
+      }}
+      onPointerDownCapture={(event: ReactPointerEvent<HTMLDivElement>) => {
+        if (!editing || event.button !== 0) return
+        const target = event.target as HTMLElement
+        if (target.closest('[data-homepage-field], button, input, a')) return
+        const imageArea = target.closest<HTMLElement>('[data-homepage-image-container="true"]')
+        if (!imageArea) return
+        event.preventDefault()
+        const bounds = imageArea.getBoundingClientRect()
+        event.currentTarget.setPointerCapture(event.pointerId)
+        dragRef.current = {
+          pointerX: event.clientX,
+          pointerY: event.clientY,
+          imageX: imagePosition.x,
+          imageY: imagePosition.y,
+          width: bounds.width,
+          height: bounds.height,
+        }
+      }}
+      onPointerMoveCapture={(event: ReactPointerEvent<HTMLDivElement>) => {
+        const start = dragRef.current
+        if (!start) return
+        event.preventDefault()
+        const deltaX = ((event.clientX - start.pointerX) / start.width) * 100
+        const deltaY = ((event.clientY - start.pointerY) / start.height) * 100
+        onImagePositionChange({
+          x: clamp(start.imageX - deltaX / imageZoom, 0, 100),
+          y: clamp(start.imageY - deltaY / imageZoom, 0, 100),
+        })
+      }}
+      onPointerUpCapture={(event: ReactPointerEvent<HTMLDivElement>) => {
+        dragRef.current = null
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+      }}
+      onPointerCancelCapture={(event: ReactPointerEvent<HTMLDivElement>) => {
+        dragRef.current = null
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+      }}
+      onDragStartCapture={(event) => {
+        const target = event.target as HTMLElement
+        if (target.closest('[data-homepage-image-container="true"]')) {
+          event.preventDefault()
+        }
       }}
     >
       {children}
@@ -161,9 +277,18 @@ function EditableSectionPreview({
         }}
       />
       {editing && (
-        <div className="pointer-events-none absolute inset-x-0 top-20 z-40 mx-auto w-fit rounded-full bg-brown px-4 py-2 text-xs font-semibold text-silk shadow-xl">
-          Klik teks untuk mengetik · klik gambar untuk mengganti
-        </div>
+        <>
+          <div className="pointer-events-none absolute inset-x-0 top-20 z-40 mx-auto w-fit rounded-full bg-brown px-4 py-2 text-xs font-semibold text-silk shadow-xl">
+            Seret gambar untuk menggeser · scroll untuk zoom
+          </div>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="absolute right-4 top-4 z-50 inline-flex h-10 items-center gap-2 rounded-full border border-sand bg-silk/95 px-4 text-xs font-semibold text-forest shadow-xl backdrop-blur transition hover:bg-brown hover:text-silk"
+          >
+            <ImagePlus size={15} /> Ganti gambar
+          </button>
+        </>
       )}
     </div>
   )
@@ -223,7 +348,15 @@ function LatestUpdatesAdminPreview({ section }: { section: HomepageSection }) {
   )
 }
 
-function renderHomepageSection(section: HomepageSection) {
+function renderHomepageSection(
+  section: HomepageSection,
+  options?: {
+    editing?: boolean
+    onTitleChange?: (value: string) => void
+    onContentChange?: (value: string) => void
+    onImageUpload?: (file: File) => Promise<string>
+  }
+) {
   switch (section.sectionKey) {
     case 'hero':
       return <HeroSection section={section} />
@@ -242,11 +375,11 @@ function renderHomepageSection(section: HomepageSection) {
     case 'location-navigation':
       return <LocationNavigationSection section={section} />
     case 'about-main':
-      return <AboutAnimated section={section} />
+      return <AboutAnimated section={section} editing={options?.editing} onTitleChange={options?.onTitleChange} onContentChange={options?.onContentChange} onImageUpload={options?.onImageUpload} />
     case 'impact-main':
       return <ImpactAnimated section={section} />
     case 'collaboration-events':
-      return <CollaborationEventsSection />
+      return <CollaborationEventsSection section={section} editing={options?.editing} onTitleChange={options?.onTitleChange} onContentChange={options?.onContentChange} onImageUpload={options?.onImageUpload} />
     default:
       return <CustomHomepageSection section={section} />
   }
@@ -256,6 +389,7 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
   const [sections, setSections] = useState<HomepageSection[]>([])
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [eyebrow, setEyebrow] = useState(defaultSectionEyebrow(page))
   const [image, setImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -267,6 +401,8 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [template, setTemplate] = useState<HomepageSectionTemplate | null>(null)
+  const [imagePosition, setImagePosition] = useState({ x: 50, y: 50 })
+  const [imageZoom, setImageZoom] = useState(1)
   const requiredSectionSyncAttempted = useRef(false)
 
   const orderedSections = useMemo(() => {
@@ -286,6 +422,30 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
 
     setImage(file)
     setPreviewUrl(file ? URL.createObjectURL(file) : null)
+    if (file) {
+      setImagePosition({ x: 50, y: 50 })
+      setImageZoom(1)
+    }
+  }
+
+  async function uploadCollaborationImage(file: File) {
+    setError('')
+    setMessage('Mengunggah gambar...')
+    const formData = new FormData()
+    formData.set('password', password)
+    formData.set('image', file)
+
+    const response = await fetch('/api/site-images', { method: 'POST', body: formData })
+    const payload = await response.json()
+    if (!response.ok) {
+      const uploadError = payload.message ?? 'Gagal mengunggah gambar.'
+      setMessage('')
+      setError(uploadError)
+      throw new Error(uploadError)
+    }
+
+    setMessage('Gambar siap. Tekan Simpan untuk menerapkan perubahan.')
+    return String(payload.imageUrl)
   }
 
   async function loadSections() {
@@ -293,7 +453,10 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
     setError('')
 
     try {
-      const response = await fetch('/api/homepage-sections', { cache: 'no-store' })
+      const response = await fetch('/api/homepage-sections', {
+        cache: 'no-store',
+        headers: { 'x-admin-password': password },
+      })
       const payload = await response.json()
 
       if (!response.ok) {
@@ -458,8 +621,12 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
     formData.set('password', password)
     formData.set('title', title.trim())
     formData.set('description', description.trim())
+    formData.set('label', eyebrow.trim() || defaultSectionEyebrow(page))
     formData.set('page', page)
     formData.set('template', template ?? 'editorial')
+    formData.set('imagePositionX', String(imagePosition.x))
+    formData.set('imagePositionY', String(imagePosition.y))
+    formData.set('imageZoom', String(imageZoom))
     if (image) formData.set('image', image)
 
     try {
@@ -482,10 +649,13 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
       )
       setTitle('')
       setDescription('')
+      setEyebrow(defaultSectionEyebrow(page))
       handleImageChange(null)
       setShowCreate(false)
       setEditingId(null)
       setTemplate(null)
+      setImagePosition({ x: 50, y: 50 })
+      setImageZoom(1)
       setMessage(
         editingId
           ? 'Isi bagian berhasil diperbarui di beranda.'
@@ -502,7 +672,14 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
     setEditingId(section.id)
     setTitle(section.title)
     setDescription(section.description)
+    setEyebrow(
+      section.label.trim().toLowerCase() === section.title.trim().toLowerCase()
+        ? defaultSectionEyebrow(page)
+        : section.label
+    )
     handleImageChange(null)
+    setImagePosition({ x: section.imagePositionX ?? 50, y: section.imagePositionY ?? 50 })
+    setImageZoom(Math.max(1, section.imageZoom ?? 1))
     setShowCreate(true)
     setMessage('')
     setError('')
@@ -513,7 +690,10 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
     setShowCreate(false)
     setTitle('')
     setDescription('')
+    setEyebrow(defaultSectionEyebrow(page))
     handleImageChange(null)
+    setImagePosition({ x: 50, y: 50 })
+    setImageZoom(1)
   }
 
   return (
@@ -542,7 +722,10 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
                   setTemplate(null)
                   setTitle('')
                   setDescription('')
+                  setEyebrow(defaultSectionEyebrow(page))
                   handleImageChange(null)
+                  setImagePosition({ x: 50, y: 50 })
+                  setImageZoom(1)
                 }
               }}
               className="inline-flex h-10 items-center gap-2 bg-forest px-4 text-sm font-semibold text-silk transition hover:bg-brown"
@@ -705,7 +888,7 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
                       Isi langsung pada template
                     </p>
                     <p className="mt-1 text-sm text-stone">
-                      Klik judul atau isi untuk mengetik. Klik gambar untuk menggantinya.
+                      Klik teks untuk mengetik. Seret gambar untuk menggeser dan gunakan scroll untuk zoom.
                     </p>
                   </div>
                 </div>
@@ -716,11 +899,14 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
                       id: 'new-section-preview',
                       sectionKey: null,
                       kind: 'custom',
-                      label: title,
+                      label: eyebrow,
                       title,
                       description,
                       imageUrl: previewUrl ?? '/images/editorial/founder-canting.webp',
                       imagePath: null,
+                      imagePositionX: imagePosition.x,
+                      imagePositionY: imagePosition.y,
+                      imageZoom,
                       isVisible: true,
                       sortOrder: orderedSections.length * 10 + 10,
                       createdAt: '',
@@ -730,18 +916,26 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
                     editing
                     onTitleChange={setTitle}
                     onDescriptionChange={setDescription}
+                    onEyebrowChange={setEyebrow}
                     onImageChange={handleImageChange}
+                    imagePosition={imagePosition}
+                    imageZoom={imageZoom}
+                    onImagePositionChange={setImagePosition}
+                    onImageZoomChange={setImageZoom}
                   >
                     <CustomHomepageSection
                       section={{
                         id: 'new-section-preview',
                         sectionKey: null,
                         kind: 'custom',
-                        label: title,
+                        label: eyebrow,
                         title,
                         description,
                         imageUrl: previewUrl ?? '/images/editorial/founder-canting.webp',
                         imagePath: null,
+                        imagePositionX: imagePosition.x,
+                        imagePositionY: imagePosition.y,
+                        imageZoom,
                         isVisible: true,
                         sortOrder: orderedSections.length * 10 + 10,
                         createdAt: '',
@@ -778,7 +972,13 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
                 editingId === section.id
                   ? {
                       ...section,
+                      label: eyebrow,
+                      title,
+                      description,
                       imageUrl: previewUrl ?? section.imageUrl,
+                      imagePositionX: imagePosition.x,
+                      imagePositionY: imagePosition.y,
+                      imageZoom,
                     }
                   : section
 
@@ -888,9 +1088,19 @@ export default function HomepageSectionManager({ password, page = 'home' }: Prop
                     editing={editingId === section.id}
                     onTitleChange={setTitle}
                     onDescriptionChange={setDescription}
+                    onEyebrowChange={setEyebrow}
                     onImageChange={handleImageChange}
+                    imagePosition={imagePosition}
+                    imageZoom={imageZoom}
+                    onImagePositionChange={setImagePosition}
+                    onImageZoomChange={setImageZoom}
                   >
-                    {renderHomepageSection(previewSection)}
+                    {renderHomepageSection(previewSection, {
+                      editing: editingId === section.id,
+                      onTitleChange: setTitle,
+                      onContentChange: setDescription,
+                      onImageUpload: uploadCollaborationImage,
+                    })}
                   </EditableSectionPreview>
                 </div>
 
